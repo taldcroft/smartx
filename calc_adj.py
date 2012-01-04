@@ -78,8 +78,8 @@ def make_plots(displ, adj, clip=None):
     imshow(resid, vmin=vmin, vmax=vmax)
     colorbar(orientation='horizontal', fraction=0.07)
     subplot(2, 1, 2)
-    vmin = residf[int(len(residf) * 0.05)]
-    vmax = residf[int(len(residf) * 0.95)]
+    vmin = residf[int(len(residf) * 0.01)]
+    vmax = residf[int(len(residf) * 0.99)]
     imshow(resid, vmin=vmin, vmax=vmax)
     colorbar(orientation='horizontal', fraction=0.07)
 
@@ -91,8 +91,8 @@ def make_plots(displ, adj, clip=None):
     plot(resid[:, cols].mean(axis=1), label='Resid')
     legend()
 
-    print "Input RMS: {:.4f}".format(displ.std())
-    print "Resid RMS: {:.4f}".format(resid.std())
+    print "Input stddev: {:.4f}".format(displ.std())
+    print "Resid stddev: {:.4f}".format(resid.std())
 
 def load_displ_grav(axis='RY', mirror='p', rms=None):
     displ = np.load('data/{}1000/{}_grav-z.npy'
@@ -111,9 +111,9 @@ def load_ifuncs(axis='RY', mirror='p'):
     ifuncs[10:20, 0:10] = if10[::-1, :, ::-1, :]
     ifuncs[0:10, 10:20] = if10[:, ::-1, :, ::-1]
     ifuncs[10:20, 10:20] = if10[::-1, ::-1, ::-1, ::-1]
-    return ifuncs, n_ax, n_az
+    return ifuncs
 
-def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0, rms=None):
+def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
     n_ax, n_az = ifuncs.shape[2:4]
     x = np.linspace(-1, 1, n_az).reshape(1, n_az)
     y = np.linspace(-1, 1, n_ax + 1).reshape(n_ax + 1, 1)
@@ -124,14 +124,23 @@ def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0, rms=None):
 
     return displ
 
-if 'ifuncs' not in globals():
-    ifuncs, n_ax, n_az = load_ifuncs('RY', 'p')
+def main():
+    # Some ugliness to initialize global vars so this can be used
+    # interactively in IPython.
+    global ifuncs, displ, clip, n_ss
+    global coeffs, adj, M_2d
+    if 'ifuncs' not in globals():
+        ifuncs = load_ifuncs('RY', 'p')
+    if 'displ' not in globals():
+        displ = load_displ_legendre(ifuncs, 8, 4, rms=5.0)
+        # OR displ = load_displ_grav('RY', 'p', rms=5.0)
+    if 'clip' not in globals():
+        clip = 20
+    if 'n_ss' not in globals():
+        n_ss = 5
 
-if 'displ' not in globals():
-    displ = load_displ_legendre(n_ax, n_az, 8, 4, rms=5.0)
-    # displ = load_displ_grav('RY', 'p', rms=5.0)
+    coeffs, adj, M_2d = calc_adj(ifuncs, displ, n_ss, clip)
+    make_plots(displ, adj, clip)
 
-clip = 20
-n_ss = 5
-coeffs, adj, M_2d = calc_adj(ifuncs, displ, n_ss, clip)
-make_plots(displ, adj, clip)
+if __name__ == '__main__':
+    main()
