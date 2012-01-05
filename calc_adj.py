@@ -65,23 +65,26 @@ def make_plots(displ, adj, clip=None):
     vmax = np.max([displ, adj])
     figure(1, figsize=(6, 8))
     clf()
-    subplot(2, 1, 1)
+    subplot(3, 1, 1)
     imshow(displ, vmin=vmin, vmax=vmax)
-    subplot(2, 1, 2)
+    gca().axison = False
+    title('Input distortion')
+    colorbar(fraction=0.07)
+    subplot(3, 1, 2)
     imshow(adj, vmin=vmin, vmax=vmax)
+    title('Best-fit adjustment')
+    gca().axison = False
+    colorbar(fraction=0.07)
 
-    figure(2, figsize=(6, 8))
-    clf()
-    subplot(2, 1, 1)
     resid = displ - adj
     residf = np.sort(resid.flatten())
-    imshow(resid, vmin=vmin, vmax=vmax)
-    colorbar(orientation='horizontal', fraction=0.07)
-    subplot(2, 1, 2)
     vmin = residf[int(len(residf) * 0.01)]
     vmax = residf[int(len(residf) * 0.99)]
+    subplot(3, 1, 3)
+    title('Residual')
     imshow(resid, vmin=vmin, vmax=vmax)
-    colorbar(orientation='horizontal', fraction=0.07)
+    gca().axison = False
+    colorbar(fraction=0.07)
 
     figure(3)
     clf()
@@ -91,6 +94,7 @@ def make_plots(displ, adj, clip=None):
     plot(resid[:, cols].mean(axis=1), label='Resid')
     legend()
 
+    # Also show the RMS and mean
     print "Input stddev: {:.4f}".format(displ.std())
     print "Resid stddev: {:.4f}".format(resid.std())
 
@@ -106,11 +110,17 @@ def load_ifuncs(axis='RY', mirror='p'):
     filename = 'data/{}1000/{}_ifuncs.npy'.format(mirror, axis)
     if10 = np.load(filename) * RAD2ARCSEC
     n_ax, n_az = if10.shape[2:4]
+    if axis == 'RY':
+        symmfac = -1
+    elif axis in 'XYZ':
+        symmfac = 1
+    else:
+        raise ValueError('Which symmfac??')
     ifuncs = np.empty([20, 20, n_ax, n_az])
     ifuncs[0:10, 0:10] = if10
-    ifuncs[10:20, 0:10] = if10[::-1, :, ::-1, :]
+    ifuncs[10:20, 0:10] = symmfac * if10[::-1, :, ::-1, :]
     ifuncs[0:10, 10:20] = if10[:, ::-1, :, ::-1]
-    ifuncs[10:20, 10:20] = if10[::-1, ::-1, ::-1, ::-1]
+    ifuncs[10:20, 10:20] = symmfac * if10[::-1, ::-1, ::-1, ::-1]
     return ifuncs
 
 def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
@@ -124,7 +134,7 @@ def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
 
     return displ
 
-def main():
+def do_calc():
     # Some ugliness to initialize global vars so this can be used
     # interactively in IPython.
     global ifuncs, displ, clip, n_ss
@@ -142,5 +152,3 @@ def main():
     coeffs, adj, M_2d = calc_adj(ifuncs, displ, n_ss, clip)
     make_plots(displ, adj, clip)
 
-if __name__ == '__main__':
-    main()
