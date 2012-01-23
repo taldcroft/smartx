@@ -95,8 +95,8 @@ def make_plots(displ, adj, clip=None):
     legend()
 
     # Also show the RMS and mean
-    print "Input stddev: {:.4f}".format(displ.std())
-    print "Resid stddev: {:.4f}".format(resid.std())
+    print "Input stddev, mean: {:.4f},{:.4f}".format(displ.std(), displ.mean())
+    print "Resid stddev, mean: {:.4f},{:.4f}".format(resid.std(), resid.mean())
 
 def load_displ_grav(axis='RY', mirror='p', rms=None):
     displ = np.load('data/{}1000/{}_grav-z.npy'
@@ -143,7 +143,7 @@ def do_calc():
         ifuncs = load_ifuncs('RY', 'p')
     if 'displ' not in globals():
         displ = load_displ_legendre(ifuncs, 8, 4, rms=5.0)
-        # OR displ = load_displ_grav('RY', 'p', rms=5.0)
+        # OR displ = load_displ_grav('RY', 'p')
     if 'clip' not in globals():
         clip = 20
     if 'n_ss' not in globals():
