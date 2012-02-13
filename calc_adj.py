@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.linalg
 from scipy.special import legendre
+import matplotlib.pyplot as plt
+
 
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 
@@ -63,40 +65,41 @@ def make_plots(displ, adj, clip=None):
 
     vmin = np.min([displ, adj])
     vmax = np.max([displ, adj])
-    figure(1, figsize=(6, 8))
-    clf()
-    subplot(3, 1, 1)
-    imshow(displ, vmin=vmin, vmax=vmax)
-    gca().axison = False
-    title('Input distortion')
-    colorbar(fraction=0.07)
-    subplot(3, 1, 2)
-    imshow(adj, vmin=vmin, vmax=vmax)
-    title('Best-fit adjustment')
-    gca().axison = False
-    colorbar(fraction=0.07)
+    plt.figure(1, figsize=(6, 8))
+    plt.clf()
+    plt.subplot(3, 1, 1)
+    plt.imshow(displ, vmin=vmin, vmax=vmax)
+    plt.gca().axison = False
+    plt.title('Input distortion')
+    plt.colorbar(fraction=0.07)
+    plt.subplot(3, 1, 2)
+    plt.imshow(adj, vmin=vmin, vmax=vmax)
+    plt.title('Best-fit adjustment')
+    plt.gca().axison = False
+    plt.colorbar(fraction=0.07)
 
     resid = displ - adj
     residf = np.sort(resid.flatten())
     vmin = residf[int(len(residf) * 0.01)]
     vmax = residf[int(len(residf) * 0.99)]
-    subplot(3, 1, 3)
-    title('Residual')
-    imshow(resid, vmin=vmin, vmax=vmax)
-    gca().axison = False
-    colorbar(fraction=0.07)
+    plt.subplot(3, 1, 3)
+    plt.title('Residual')
+    plt.imshow(resid, vmin=vmin, vmax=vmax)
+    plt.gca().axison = False
+    plt.colorbar(fraction=0.07)
 
-    figure(3)
-    clf()
+    plt.figure(3)
+    plt.clf()
     cols = slice(150, 160)
-    plot(displ[:, cols].mean(axis=1) / 10., label='Input / 10')
-    plot(adj[:, cols].mean(axis=1) / 10., label='Adjust / 10')
-    plot(resid[:, cols].mean(axis=1), label='Resid')
-    legend()
+    plt.plot(displ[:, cols].mean(axis=1) / 10., label='Input / 10')
+    plt.plot(adj[:, cols].mean(axis=1) / 10., label='Adjust / 10')
+    plt.plot(resid[:, cols].mean(axis=1), label='Resid')
+    plt.legend()
 
     # Also show the RMS and mean
     print "Input stddev, mean: {:.4f},{:.4f}".format(displ.std(), displ.mean())
     print "Resid stddev, mean: {:.4f},{:.4f}".format(resid.std(), resid.mean())
+
 
 def load_displ_grav(axis='RY', mirror='p', rms=None):
     displ = np.load('data/{}1000/{}_grav-z.npy'
@@ -105,6 +108,7 @@ def load_displ_grav(axis='RY', mirror='p', rms=None):
         displ = displ / np.std(displ) * rms
 
     return displ
+
 
 def load_ifuncs(axis='RY', mirror='p'):
     filename = 'data/{}1000/{}_ifuncs.npy'.format(mirror, axis)
@@ -123,6 +127,7 @@ def load_ifuncs(axis='RY', mirror='p'):
     ifuncs[10:20, 10:20] = symmfac * if10[::-1, ::-1, ::-1, ::-1]
     return ifuncs
 
+
 def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
     n_ax, n_az = ifuncs.shape[2:4]
     x = np.linspace(-1, 1, n_az).reshape(1, n_az)
@@ -133,6 +138,7 @@ def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
         displ = displ / np.std(displ) * rms
 
     return displ
+
 
 def do_calc():
     # Some ugliness to initialize global vars so this can be used
@@ -151,4 +157,3 @@ def do_calc():
 
     coeffs, adj, M_2d = calc_adj(ifuncs, displ, n_ss, clip)
     make_plots(displ, adj, clip)
-
