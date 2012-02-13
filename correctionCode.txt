@@ -1,0 +1,98 @@
+This is mathematica code for using the known influence 
+functions to correct for figure errors.
+
+File details are someone irrelevant, as we can use 
+different dimensions and different numbers of nodes.
+ 
+
+(* For a particular conical piece, 
+The nodes file, /data/das/GENX/ird10/davisDec10/1g1umP-1000/Gen-X_P-1000_nodes.txt gives radial coordinate r from 1000.313 mm to \
+1002.875 mm, 
+angle \[Theta] from 0 deg to 23.49127 deg with 0.028647891deg = 
+ 1.71882 arcmin spacing, and axial coordinate z from 25 mm to 230 mm \
+with 0.5 mm spacing 
+
+So we have 411 axial nodes, and 821 azimuthal nodes.
+  
+  The influence functions are 20 x 20 simulated piezo cells:
+/data/das/GENX/ird10/davisDec10/1g1umP-1000/Gen-X_P-1000_1umPiezo_10, 
+< 1 to 10 >.dat with 10, m = 10, (21-m) for the functions 10, < 
+ 11to 20 > .dat
+ *)
+
+nodeR[z_] :=  1000 + z Tan[0.0125](* mm *)
+\[Theta]node =  Table[i, {i, 0., 23.5, 0.028647891044776}];(* degrees *)
+
+znode = Table[   i, {i, 25., 230., 0.5}]; (* mm from intersection plane *)
+nodes = Length[\[Theta]node] Length[znode]
+\[Theta]dim = Length[\[Theta]node]
+zdim = Length[znode]
+
+
+
+preFeaData = "/data/das/GENX/ird10/davisDec10/1g1umP-1000/feaData10,"
+IFten = Table[j, {j, 10}]
+Do[IFten[[j]] = Read[preFeaData <> ToString[j] <> ".dat"]; 
+ Close[preFeaData <> ToString[j] <> ".dat"], {j, 1, 10}]
+Dimensions[IFten]
+
+The shape may vary, but the important issue is the deflection from the
+nominal shape, which is the gravity  deflection file for the present
+case. 
+the gravity deflection file is  /data/das/GENX/ird10/davisDec10/
+   1g1umP-1000/ Gen-X_P-1000_1umPiezo_GRAV-Z.dat
+
+gravS = OpenRead[
+  "/data/das/GENX/ird10/davisDec10/1g1umP-1000/Gen-X_P-1000_1umPiezo_\
+GRAV-Z.dat"]
+gravHeader = Table[Read[gravS, Record], {i, 16}];
+gravData = 
+  Table[Read[
+     gravS, {Number, Number, Number, Number, Number, Number, 
+      Number}][[2]], {nodes}];
+Close[gravS]
+
+(* so gravData is a 1-D array of {337431} elements (=nodes)
+
+I've done only the single central azimuthal strip, axial slope
+minimization. This is the element 
+gravData[[411 (i - 1) + j]] where j goes from 1 to 821.  *)
+
+
+The basic code, with output is
+
+tim1 = DateList[]
+brules = Minimize[
+  Variance[Flatten[
+    Table[  (gravData[[168510 + j + 1]] - gravData[[168510 + j]]) - 
+      Sum[b[[i]] IFten[[i, k , j + 1 , 3]], {i, 10}] + 
+      Sum[b[[i]] IFten[[i, k, j, 3]], {i, 10}] - 
+      Sum[b[[i + 10]] IFten[[11 - i, k , 411 - j + 1 , 3]], {i, 10}] +
+       Sum[b[[i + 10]] IFten[[11 - i, k, 411 - j, 3]], {i, 10}], {k, 
+      410, 410}, {j, Length[znode] - 1}]]], Table[b[[jj]], {jj, 20}]]
+tim2 = DateList[]
+7200. Rad Sqrt[brules[[1]]]
+deltim[tim2, tim1]
+
+{2011, 4, 20, 5, 46, 39.996590}
+
+{6.13547*10^-16, {b1 -> 0.00365501, b2 -> -0.00338775, 
+  b3 -> -0.0108481, b4 -> -0.0127913, b5 -> -0.0114779, 
+  b6 -> -0.00868323, b7 -> -0.00572022, b8 -> -0.00316282, 
+  b9 -> -0.00113188, b10 -> 0.000524527, b11 -> -0.00207748, 
+  b12 -> -0.00382899, b13 -> -0.00604304, b14 -> -0.00885421, 
+  b15 -> -0.012129, b16 -> -0.0152195, b17 -> -0.0167507, 
+  b18 -> -0.0147761, b19 -> -0.00676965, b20 -> 0.00207924}}
+
+{2011, 4, 20, 5, 46, 44.178893}
+
+0.0102183
+
+4.1823
+
+
+The variance isn't quite what we really want, because we want the rms
+about zero slope errors. But we can take out the mean slope error with
+a tilt during the alignment process (in principle). The mathematica
+code with RootMeanSquare instead of Variance runs about 10 times
+slower -- don't know why.

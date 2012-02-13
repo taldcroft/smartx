@@ -1,0 +1,20 @@
+case=<case>
+mkdir $case
+
+cd $case
+ftp cfa-ftp
+prompt
+mget *
+
+mkdir p1000
+mkdir s1000
+
+mv *P-1000* p1000
+mv *S-1000* s1000
+
+cd p1000
+unzip *.zip
+
+cd ../s1000
+unzip *.zip
+
