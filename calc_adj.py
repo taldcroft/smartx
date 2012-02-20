@@ -56,7 +56,7 @@ def calc_adj(ifuncs, displ, n_ss=10, clip=None):
     adj = M_2d_all .dot (coeffs)
     adj_2d = adj.reshape(*displ.shape)
 
-    return coeffs, adj_2d, M_2d_all
+    return coeffs, adj_2d, M_2d_all, displ
 
 
 def make_plots(displ, adj, clip=None):
@@ -101,17 +101,17 @@ def make_plots(displ, adj, clip=None):
     print "Resid stddev, mean: {:.4f},{:.4f}".format(resid.std(), resid.mean())
 
 
-def load_displ_grav(axis='RY', mirror='p', rms=None):
-    displ = np.load('data/{}1000/{}_grav-z.npy'
-                    .format(mirror, axis)) * RAD2ARCSEC
+def load_displ_grav(axis='RY', mirror='p', rms=None, case='7+2'):
+    displ = np.load('data/{}/{}1000/{}_grav-z.npy'
+                    .format(case, mirror, axis)) * RAD2ARCSEC
     if rms:
         displ = displ / np.std(displ) * rms
 
     return displ
 
 
-def load_ifuncs(axis='RY', mirror='p'):
-    filename = 'data/{}1000/{}_ifuncs.npy'.format(mirror, axis)
+def load_ifuncs(axis='RY', mirror='p', case='7+2'):
+    filename = 'data/{}/{}1000/{}_ifuncs.npy'.format(case, mirror, axis)
     if10 = np.load(filename) * RAD2ARCSEC
     n_ax, n_az = if10.shape[2:4]
     if axis == 'RY':
@@ -131,9 +131,8 @@ def load_ifuncs(axis='RY', mirror='p'):
 def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
     n_ax, n_az = ifuncs.shape[2:4]
     x = np.linspace(-1, 1, n_az).reshape(1, n_az)
-    y = np.linspace(-1, 1, n_ax + 1).reshape(n_ax + 1, 1)
-    rdispl = (1 - legendre(ord_ax)(y)) * (1 - legendre(ord_az)(x))
-    displ = rdispl[1:] - rdispl[:-1]
+    y = np.linspace(-1, 1, n_ax).reshape(n_ax, 1)
+    displ = (1 - legendre(ord_ax)(y)) * (1 - legendre(ord_az)(x))
     if rms:
         displ = displ / np.std(displ) * rms
 
