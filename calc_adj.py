@@ -128,6 +128,52 @@ def load_ifuncs(axis='RY', mirror='p', case='7+2'):
     return ifuncs
 
 
+def load_file_legendre(ifuncs, filename='data/exemplar_021312.dat',
+                       slope=False, rms=None):
+    n_ax, n_az = ifuncs.shape[2:4]
+    lines = (line.strip() for line in open(filename, 'rb')
+             if not line.startswith('#'))
+    D = np.array([[float(val) for val in line.split()]
+                  for line in lines])
+    nD_ax, nD_az = D.shape  # nD_m, nD_n
+
+    x = np.linspace(-1, 1, n_az).reshape(1, n_az)
+    y = np.linspace(-1, 1, n_ax).reshape(n_ax, 1)
+    Pm_x = np.vstack([legendre(i)(x) for i in range(nD_ax)])
+    Pn_y = np.hstack([legendre(i)(y) for i in range(nD_az)])
+    Y_az_ax = np.zeros((n_ax, n_az), dtype=np.float)
+    for n in range(nD_az):
+        sum_Pm = np.zeros_like(x)
+        for m in range(nD_ax):
+            sum_Pm += D[m, n] * Pm_x[m, :]
+        Y_az_ax += Pn_y[:, n].reshape(-1, 1) * sum_Pm
+
+    # Unvectorized version for reference.
+    #
+    # xs = np.linspace(-1, 1, n_az)
+    # ys = np.linspace(-1, 1, n_ax)
+    # Pm_x = np.vstack([legendre(i)(xs) for i in range(nD_ax)])
+    # Pn_y = np.vstack([legendre(i)(ys) for i in range(nD_az)])
+    # Y_az_ax = np.zeros((n_ax, n_az), dtype=np.float)
+    # for ix, x in enumerate(xs):
+    #     for iy, y in enumerate(ys):
+    #         for n in range(nD_az):
+    #             sum_Pm = 0.0
+    #             for m in range(nD_ax):
+    #                 sum_Pm += D[m, n] * Pm_x[m, ix]
+    #             Y_az_ax[iy, ix] += Pn_y[n, iy] * sum_Pm
+
+    if slope:
+        displ = np.gradient(Y_az_ax, 0.5)[0]
+    else:
+        displ = Y_az_ax
+
+    if rms:
+        displ = displ / np.std(displ) * rms
+
+    return displ
+
+
 def load_displ_legendre(ifuncs, ord_ax=2, ord_az=0, rms=None):
     n_ax, n_az = ifuncs.shape[2:4]
     x = np.linspace(-1, 1, n_az).reshape(1, n_az)
