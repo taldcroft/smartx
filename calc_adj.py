@@ -59,7 +59,7 @@ def calc_adj(ifuncs, displ, n_ss=10, clip=None):
     return coeffs, adj_2d, M_2d_all, displ
 
 
-def make_plots(displ, adj, clip=None):
+def make_plots(displ, adj, clip=None, col0=150, col1=160):
     if clip:
         displ = displ[clip:-clip, clip:-clip]
 
@@ -88,9 +88,9 @@ def make_plots(displ, adj, clip=None):
     plt.gca().axison = False
     plt.colorbar(fraction=0.07)
 
-    plt.figure(3)
+    plt.figure(2)
     plt.clf()
-    cols = slice(150, 160)
+    cols = slice(col0, col1)
     plt.plot(displ[:, cols].mean(axis=1) / 10., label='Input / 10')
     plt.plot(adj[:, cols].mean(axis=1) / 10., label='Adjust / 10')
     plt.plot(resid[:, cols].mean(axis=1), label='Resid')
@@ -110,7 +110,7 @@ def load_displ_grav(axis='RY', mirror='p', rms=None, case='7+2'):
     return displ
 
 
-def load_ifuncs(axis='RY', mirror='p', case='7+2'):
+def load_ifuncs(axis='RY', mirror='p', case='10+2'):
     filename = 'data/{}/{}1000/{}_ifuncs.npy'.format(case, mirror, axis)
     if10 = np.load(filename) * RAD2ARCSEC
     n_ax, n_az = if10.shape[2:4]
@@ -164,7 +164,8 @@ def load_file_legendre(ifuncs, filename='data/exemplar_021312.dat',
     #             Y_az_ax[iy, ix] += Pn_y[n, iy] * sum_Pm
 
     if slope:
-        displ = np.gradient(Y_az_ax, 0.5)[0]
+        # 0.5 mm spacing * 1000 um / mm, then convert radians to arcsec
+        displ = np.gradient(Y_az_ax, 0.5 * 1000)[0] * RAD2ARCSEC
     else:
         displ = Y_az_ax
 
@@ -200,5 +201,5 @@ def do_calc():
     if 'n_ss' not in globals():
         n_ss = 5
 
-    coeffs, adj, M_2d = calc_adj(ifuncs, displ, n_ss, clip)
+    coeffs, adj, M_2d, displ_clip = calc_adj(ifuncs, displ, n_ss, clip)
     make_plots(displ, adj, clip)

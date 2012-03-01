@@ -6,15 +6,23 @@ ftp cfa-ftp
 prompt
 mget *
 
-mkdir p1000
-mkdir s1000
+mkdir -p p1000/ifuncs
+mkdir -p s1000/ifuncs
 
-mv *P-1000* p1000
-mv *S-1000* s1000
+mv *P1000* p1000
+mv *S1000* s1000
 
-cd p1000
+cd p1000/ifuncs
 unzip *.zip
 
-cd ../s1000
+cd ../../s1000/ifuncs
 unzip *.zip
 
+cd ../..
+python ../../read_ifuncs.py
+
+# Validate npy ifuncs files
+
+# Then remove txt versions
+rm p1000/ifuncs/P*.txt
+rm s1000/ifuncs/S*.txt
