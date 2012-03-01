@@ -4,9 +4,10 @@ import asciitable
 
 n_fea_azim = 821
 n_fea_axial = 411
-n_if_azim = 10
-n_if_axial = 10
+n_if_azim = 11
+n_if_axial = 11
 
+startrc = 0
 out = {}
 cols = 'X   Y   Z   RX  RY  RZ'.split()
 for col in cols:
@@ -18,7 +19,7 @@ for mir in ('p', 's'):
     for i in range(n_if_azim):
         for j in range(n_if_axial):
             fnames = glob('{}1000/ifuncs/*{}*1000*_{},{}.*'.format(
-                    mir, mir.upper(), j + 1, i + 1))
+                    mir, mir.upper(), j + startrc, i + startrc))
             if len(fnames) != 1:
                 raise ValueError('Got {}'.format(fnames))
 

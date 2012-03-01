@@ -1,3 +1,50 @@
+#########  For half data
+
+mv P1000_1umHalf-10+0_10,1a.txt  P1000_1umHalf-10+0_10,0.txt
+mv P1000_1umHalf-10+0_10,1b.txt  P1000_1umHalf-10+0_10,1.txt
+mv P1000_1umHalf-10+0_1a,10.txt  P1000_1umHalf-10+0_0,10.txt
+mv P1000_1umHalf-10+0_1a,1a.txt  P1000_1umHalf-10+0_0,0.txt
+mv P1000_1umHalf-10+0_1a,1b.txt  P1000_1umHalf-10+0_0,1.txt
+mv P1000_1umHalf-10+0_1a,2.txt   P1000_1umHalf-10+0_0,2.txt
+mv P1000_1umHalf-10+0_1a,3.txt   P1000_1umHalf-10+0_0,3.txt
+mv P1000_1umHalf-10+0_1a,4.txt   P1000_1umHalf-10+0_0,4.txt
+mv P1000_1umHalf-10+0_1a,5.txt   P1000_1umHalf-10+0_0,5.txt
+mv P1000_1umHalf-10+0_1a,6.txt   P1000_1umHalf-10+0_0,6.txt
+mv P1000_1umHalf-10+0_1a,7.txt   P1000_1umHalf-10+0_0,7.txt
+mv P1000_1umHalf-10+0_1a,8.txt   P1000_1umHalf-10+0_0,8.txt
+mv P1000_1umHalf-10+0_1a,9.txt   P1000_1umHalf-10+0_0,9.txt
+mv P1000_1umHalf-10+0_1b,10.txt  P1000_1umHalf-10+0_1,10.txt
+mv P1000_1umHalf-10+0_1b,1a.txt  P1000_1umHalf-10+0_1,0.txt
+mv P1000_1umHalf-10+0_1b,1b.txt  P1000_1umHalf-10+0_1,1.txt
+mv P1000_1umHalf-10+0_1b,2.txt   P1000_1umHalf-10+0_1,2.txt
+mv P1000_1umHalf-10+0_1b,3.txt   P1000_1umHalf-10+0_1,3.txt
+mv P1000_1umHalf-10+0_1b,4.txt   P1000_1umHalf-10+0_1,4.txt
+mv P1000_1umHalf-10+0_1b,5.txt   P1000_1umHalf-10+0_1,5.txt
+mv P1000_1umHalf-10+0_1b,6.txt   P1000_1umHalf-10+0_1,6.txt
+mv P1000_1umHalf-10+0_1b,7.txt   P1000_1umHalf-10+0_1,7.txt
+mv P1000_1umHalf-10+0_1b,8.txt   P1000_1umHalf-10+0_1,8.txt
+mv P1000_1umHalf-10+0_1b,9.txt   P1000_1umHalf-10+0_1,9.txt
+mv P1000_1umHalf-10+0_2,1a.txt   P1000_1umHalf-10+0_2,0.txt
+mv P1000_1umHalf-10+0_2,1b.txt   P1000_1umHalf-10+0_2,1.txt
+mv P1000_1umHalf-10+0_3,1a.txt   P1000_1umHalf-10+0_3,0.txt
+mv P1000_1umHalf-10+0_3,1b.txt   P1000_1umHalf-10+0_3,1.txt
+mv P1000_1umHalf-10+0_4,1a.txt   P1000_1umHalf-10+0_4,0.txt
+mv P1000_1umHalf-10+0_4,1b.txt   P1000_1umHalf-10+0_4,1.txt
+mv P1000_1umHalf-10+0_5,1a.txt   P1000_1umHalf-10+0_5,0.txt
+mv P1000_1umHalf-10+0_5,1b.txt   P1000_1umHalf-10+0_5,1.txt
+mv P1000_1umHalf-10+0_6,1a.txt   P1000_1umHalf-10+0_6,0.txt
+mv P1000_1umHalf-10+0_6,1b.txt   P1000_1umHalf-10+0_6,1.txt
+mv P1000_1umHalf-10+0_7,1a.txt   P1000_1umHalf-10+0_7,0.txt
+mv P1000_1umHalf-10+0_7,1b.txt   P1000_1umHalf-10+0_7,1.txt
+mv P1000_1umHalf-10+0_8,1a.txt   P1000_1umHalf-10+0_8,0.txt
+mv P1000_1umHalf-10+0_8,1b.txt   P1000_1umHalf-10+0_8,1.txt
+mv P1000_1umHalf-10+0_9,1a.txt   P1000_1umHalf-10+0_9,0.txt
+mv P1000_1umHalf-10+0_9,1b.txt   P1000_1umHalf-10+0_9,1.txt
+
+
+
+##########
+
 case=<case>
 mkdir $case
 
@@ -26,3 +73,6 @@ python ../../read_ifuncs.py
 # Then remove txt versions
 rm p1000/ifuncs/P*.txt
 rm s1000/ifuncs/S*.txt
+
+
+

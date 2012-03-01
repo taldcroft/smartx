@@ -59,6 +59,16 @@ def calc_adj(ifuncs, displ, n_ss=10, clip=None):
     return coeffs, adj_2d, M_2d_all, displ
 
 
+def calc_adj_coeffs(ifuncs, coeffs):
+    n_ax, n_az = ifuncs.shape[2:4]
+    M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
+    M_2d_all = M_3d_all.reshape(M_3d_all.shape[0], -1).transpose()
+    adj = M_2d_all.dot(coeffs)
+    adj_2d = adj.reshape(n_ax, n_az)
+
+    return adj_2d
+
+
 def make_plots(displ, adj, clip=None, col0=150, col1=160):
     if clip:
         displ = displ[clip:-clip, clip:-clip]
