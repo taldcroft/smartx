@@ -69,13 +69,20 @@ def calc_adj_coeffs(ifuncs, coeffs):
     return adj_2d
 
 
-def make_plots(displ, adj, clip=None, col0=150, col1=160):
+def make_plots(displ, adj, clip=None, col0=150, col1=160,
+               fig1=None, fig2=None,
+               save=None):
     if clip:
         displ = displ[clip:-clip, clip:-clip]
+        adj = adj[clip:-clip, clip:-clip]
 
-    vmin = np.min([displ, adj])
-    vmax = np.max([displ, adj])
-    plt.figure(1, figsize=(6, 8))
+    vals = np.hstack([displ, adj]).flatten()
+    vals.sort()
+    vmin = vals[int(len(vals) * 0.005)]
+    vmax = vals[int(len(vals) * 0.995)]
+    if fig1 is None:
+        fig1 = plt.figure(1, figsize=(6, 8))
+    plt.figure(fig1.number)
     plt.clf()
     plt.subplot(3, 1, 1)
     plt.imshow(displ, vmin=vmin, vmax=vmax)
@@ -97,14 +104,21 @@ def make_plots(displ, adj, clip=None, col0=150, col1=160):
     plt.imshow(resid, vmin=vmin, vmax=vmax)
     plt.gca().axison = False
     plt.colorbar(fraction=0.07)
+    if save:
+        plt.savefig(save + '_map.png')
 
-    plt.figure(2)
+    if fig2 is None:
+        fig2 = plt.figure(2)
+    plt.figure(fig2.number)
     plt.clf()
     cols = slice(col0, col1)
     plt.plot(displ[:, cols].mean(axis=1) / 10., label='Input / 10')
     plt.plot(adj[:, cols].mean(axis=1) / 10., label='Adjust / 10')
     plt.plot(resid[:, cols].mean(axis=1), label='Resid')
-    plt.legend()
+    plt.title('Slice on mean of cols {}:{}'.format(col0, col1))
+    plt.legend(loc='best')
+    if save:
+        plt.savefig(save + '_col.png')
 
     # Also show the RMS and mean
     print "Input stddev, mean: {:.4f},{:.4f}".format(displ.std(), displ.mean())
@@ -123,18 +137,20 @@ def load_displ_grav(axis='RY', mirror='p', rms=None, case='7+2'):
 def load_ifuncs(axis='RY', mirror='p', case='10+2'):
     filename = 'data/{}/{}1000/{}_ifuncs.npy'.format(case, mirror, axis)
     if10 = np.load(filename) * RAD2ARCSEC
-    n_ax, n_az = if10.shape[2:4]
+    nr, nc, n_ax, n_az = if10.shape
+    nr2 = nr * 2
+    nc2 = nc * 2
     if axis == 'RY':
         symmfac = -1
     elif axis in 'XYZ':
         symmfac = 1
     else:
         raise ValueError('Which symmfac??')
-    ifuncs = np.empty([20, 20, n_ax, n_az])
-    ifuncs[0:10, 0:10] = if10
-    ifuncs[10:20, 0:10] = symmfac * if10[::-1, :, ::-1, :]
-    ifuncs[0:10, 10:20] = if10[:, ::-1, :, ::-1]
-    ifuncs[10:20, 10:20] = symmfac * if10[::-1, ::-1, ::-1, ::-1]
+    ifuncs = np.empty([nr2, nc2, n_ax, n_az])
+    ifuncs[0:nr, 0:nc] = if10
+    ifuncs[nr:nr2, 0:nc] = symmfac * if10[::-1, :, ::-1, :]
+    ifuncs[0:nr, nc:nc2] = if10[:, ::-1, :, ::-1]
+    ifuncs[nr:nr2, nc:nc2] = symmfac * if10[::-1, ::-1, ::-1, ::-1]
     return ifuncs
 
 
