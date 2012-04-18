@@ -14,7 +14,7 @@ if 'save' not in globals():
 if 'corr_using' not in globals():
     corr_using = 'x'
 
-if 'ifuncs_x' in globals() and 'ifuncs_ry' in globals():
+if 'ifuncs_x' not in globals() or 'ifuncs_ry' not in globals():
     ifuncs_x = calc_adj.load_ifuncs('X', case='10+0_half')
     ifuncs_ry = calc_adj.load_ifuncs('RY', case='10+0_half')
 
