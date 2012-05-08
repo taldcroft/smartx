@@ -1,10 +1,16 @@
+import os
+
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from collections import defaultdict
+import jinja2
+import Ska.File
 
 import pyyaks.context
 
 import ifunc
+import calc_scatter
 
 
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
@@ -12,10 +18,8 @@ src = pyyaks.context.ContextDict('src')
 files = pyyaks.context.ContextDict('files', basedir='reports')
 files.update({'src_dir': '{{src.id}}',
               'index': '{{src.id}}/index',
-              'img_x_corr_x': '{{src.id}}/img_x_corr_x',
-              'img_x_corr_ry': '{{src.id}}/img_x_corr_ry',
-              'img_ry_corr_x': '{{src.id}}/img_ry_corr_x',
-              'img_ry_corr_ry': '{{src.id}}/img_ry_corr_ry',
+              'img_corr': '{{src.id}}/img_{{src.axis}}_corr_{{src.corr}}',
+              'scatter': '{{src.id}}/scatter_{{src.axis}}_corr_{{src.corr}}',
               })
 cache = {}
 
@@ -30,19 +34,30 @@ class AutoDict(dict):
             return value
 
 
+CASES = [dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                      'kwargs': {'case': 'local/10+2/p1000'}},
+              displ={'load_func': ifunc.load_file_legendre,
+                     'kwargs': {'filename': 'data/exemplar_021312.dat'}},
+              case_id='10+2_exemplar',
+              title='10+2 supports with exemplar displacements')]
+
+
 class IfuncsReport(object):
     """Provide the infrastructure to create a web based report characterizing a
     set of influence functions.
 
     :param ifuncs: dict to load ifuncs or define ifuncs
     :param displ: dict to load or define displacements
-    :param id_: ifuncs identifier for report naming
+    :param case_id: case identifier string for report naming
     :param clip: number of rows / columns from edge to clip
     :param n_ss: sub-sample period (use 1 out of n_ss rows/columns)
     :param node_sep: node separation (microns)
     :param units: units
     """
-    def __init__(self, ifuncs=None, displ=None, id_=1, clip=20, n_ss=5,
+    def __init__(self, ifuncs=None, displ=None,
+                 case_id='10+2_gravity',
+                 title='10+2 supports with 1-g gravity load',
+                 clip=20, n_ss=5,
                  node_sep=500, units='um'):
         if ifuncs is None:
             ifuncs = {'load_func': ifunc.load_ifuncs,
@@ -51,8 +66,10 @@ class IfuncsReport(object):
             displ = {'load_func': ifunc.load_displ_grav,
                      'kwargs': {'case': 'local/10+2/p1000'}}
 
-        self.ifuncs = {}
-        self.displ = {}
+        self.title = title
+        self.case_id = case_id
+        self.ifuncs = dict()
+        self.displ = AutoDict()
 
         axes = ('X', 'RY')
         # Check if input ifuncs already has X and RY keys
@@ -61,6 +78,7 @@ class IfuncsReport(object):
                 self.ifuncs[axis] = ifuncs[axis].copy()
         else:  # load ifuncs
             ifuncs['axis'] = 'X'
+            print 'Loading ifuncs ...'
             self.ifuncs['X'] = ifuncs['load_func'](**ifuncs['kwargs'])
             self.ifuncs['RY'] = np.gradient(self.ifuncs['X'], node_sep)[0]
 
@@ -69,130 +87,154 @@ class IfuncsReport(object):
         # Check if input displ already has X and RY keys
         if all(axis in displ for axis in axes):
             for axis in axes:
-                self.displ[axis] = displ[axis].copy()
+                self.displ[axis]['img']['full'] = \
+                    displ[axis]['img']['full'].copy()
         else:  # load displacements
-            self.displ['X'], self.displ['RY'] = \
+            print 'Loading displ ...'
+            self.displ['X']['img']['full'], self.displ['RY']['img']['full'] = \
                 displ['load_func'](self.n_ax, self.n_az, **displ['kwargs'])
+
+        # Provide clipped displacements
+        for axis in axes:
+            self.displ[axis]['img']['clip'] = \
+                self.displ[axis]['img']['full'][clip:-clip, clip:-clip]
 
         self.n_ss = n_ss
         self.clip = clip
-        self.coeffs = {}
-        self.adj = defaultdict(dict)
-        self.resid_std = defaultdict(dict)
-        self.resid_clip_std = defaultdict(dict)
-        self.resid_mean = defaultdict(dict)
-        self.resid_clip_mean = defaultdict(dict)
+        self.coeffs = AutoDict()  # [corr_axis]
+        self.adj = AutoDict()  # [axis][corr_axis]
+        self.resid = AutoDict()  # [clip][type] for clip=('clip'|'full')
+                                 # type = ('img'|'std'|'mean')
+        self.calc_adj()
+        self.calc_stats()
 
     def normalize(self, std, axis='X', clip=True):
         pass
 
     def calc_adj(self):
         for corr in ('X', 'RY'):
-            print 'Correcting using axis', corr
-            coeffs = ifunc.calc_coeffs(self.ifuncs[corr], self.displ[corr],
+            print 'Computing corr coeffs using axis', corr, '...'
+            coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
+                                       self.displ[corr]['img']['full'],
                                        n_ss=self.n_ss, clip=self.clip)
             self.coeffs[corr] = coeffs
+            clip = self.clip
             for axis in ('X', 'RY'):
-                self.adj[axis][corr] = ifunc.calc_adj_displ(
-                    self.ifuncs[axis], coeffs)
+                print "Computing adj[{}][{}][full,clip]".format(axis, corr)
+                adj = ifunc.calc_adj_displ(self.ifuncs[axis], coeffs)
+                self.adj[axis][corr]['full'] = adj
+                self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
 
     def calc_stats(self, axis='X', corr='X'):
-        displ = self.displ[axis]
-        adj = self.adj[axis][corr]
-        clip = self.clip
-        displ_clip = displ[clip:-clip, clip:-clip]
-        adj_clip = adj[clip:-clip, clip:-clip]
-        resid = displ - adj
-        resid_clip = displ_clip - adj_clip
+        for clip in ('clip', 'full'):
+            displ = self.displ[axis]['img'][clip]
+            adj = self.adj[axis][corr][clip]
+            resid = displ - adj
 
-        self.resid_std[axis][corr] = resid.std()
-        self.resid_mean[axis][corr] = resid.mean()
+            self.resid[axis][corr]['img'][clip] = resid
+            self.resid[axis][corr]['std'][clip] = resid.std()
+            self.resid[axis][corr]['mean'][clip] = resid.mean()
 
-        self.resid_clip_std[axis][corr] = resid_clip.std()
-        self.resid_clip_mean[axis][corr] = resid_clip.mean()
+            self.displ[axis]['std'][clip] = displ.std()
+            self.displ[axis]['mean'][clip] = displ.mean()
 
-    def make_imgs_plot(self, axis='X', corr='X'):
+    def make_scatter_plot(self, axis='X', corr='X', filename=None):
+        print 'Calculating scatter displ'
+        x, y = calc_scatter.calc_scatter(self.displ[axis]['img']['clip'])
+        plt.figure(11, figsize=(5, 3.5))
+        plt.clf()
+        plt.plot(x, y, '-b')
+        print 'Calculating scatter resid'
+        x, y = calc_scatter.calc_scatter(self.resid[axis][corr]['img']['clip'])
+        plt.plot(x, y, '-r')
+        plt.xlabel('Arcsec')
+        plt.title('Scatter')
+        if filename is not None:
+            plt.savefig(filename)
+
+    def make_imgs_plot(self, axis='X', corr='X', filename=None):
         nx = self.n_az
         ny = self.n_ax
 
-        displ = self.displ[axis]
+        displ = self.displ[axis]['img']
         adj = self.adj[axis][corr]
-        clip = self.clip
-        displ_clip = displ[clip:-clip, clip:-clip]
-        adj_clip = adj[clip:-clip, clip:-clip]
+        resid = self.resid[axis][corr]['img']
 
-        plt.figure(figsize=(6, 8))
+        n_clip = self.clip
+        clipbox_x = [n_clip, nx - n_clip, nx - n_clip, n_clip, n_clip]
+        clipbox_y = [n_clip, n_clip, ny - n_clip, ny - n_clip, n_clip]
+
+        plt.figure(10, figsize=(6, 8))
         plt.clf()
 
-        # REFACTOR THIS!
         ax = plt.subplot(3, 1, 1)
-        vmin, vmax = np.percentile(np.hstack([displ_clip, adj_clip]),
+        vmin, vmax = np.percentile(np.hstack([displ['clip'], adj['clip']]),
                                    [0.5, 99.5])
-        plt.imshow(displ, vmin=vmin, vmax=vmax)
+        plt.imshow(displ['full'], vmin=vmin, vmax=vmax)
         ax.axison = False
         ax.autoscale(enable=False)
-        plt.plot([clip, nx - clip, nx - clip, clip, clip],
-                 [clip, clip, ny - clip, ny - clip, clip], '-m')
+        plt.plot(clipbox_x, clipbox_y, '-m')
         plt.title('Input distortion {}'.format(axis))
         plt.colorbar(fraction=0.07)
 
         ax = plt.subplot(3, 1, 2)
-        plt.imshow(adj, vmin=vmin, vmax=vmax)
+        plt.imshow(adj['full'], vmin=vmin, vmax=vmax)
         plt.title('Adjustment using {}'.format(corr))
         ax.axison = False
         ax.autoscale(enable=False)
-        plt.plot([clip, nx - clip, nx - clip, clip, clip],
-                 [clip, clip, ny - clip, ny - clip, clip], '-m')
+        plt.plot(clipbox_x, clipbox_y, '-m')
         plt.colorbar(fraction=0.07)
 
-        resid = displ - adj
-        resid_clip = displ_clip - adj_clip
-        vmin, vmax = np.percentile(resid_clip, [1.0, 99.0])
+        vmin, vmax = np.percentile(resid['clip'], [0.5, 99.5])
         ax = plt.subplot(3, 1, 3)
         plt.title('Residual')
-        plt.imshow(resid, vmin=vmin, vmax=vmax)
+        plt.imshow(resid['full'], vmin=vmin, vmax=vmax)
         ax.axison = False
         ax.autoscale(enable=False)
-        plt.plot([clip, nx - clip, nx - clip, clip, clip],
-                 [clip, clip, ny - clip, ny - clip, clip], '-m')
+        plt.plot(clipbox_x, clipbox_y, '-m')
         plt.colorbar(fraction=0.07)
-
-    def make_line_plot(self, axis='X', corr='X'):
-        plt.figure(figsize=(3.5, 6))
-        plt.clf()
-        cols = slice(col0, col1)
-        plt.plot(displ[:, cols].mean(axis=1) / 10., label='Input / 10')
-        plt.plot(adj[:, cols].mean(axis=1) / 10., label='Adjust / 10')
-        plt.plot(resid[:, cols].mean(axis=1), label='Resid')
-        plt.title('Slice on mean of cols {}:{}'.format(col0, col1))
-        plt.legend(loc='best')
-        if save:
-            plt.savefig(save + '_col.png')
-
-        # Also show the RMS and mean
-        print "Input stddev, mean: {:.4f},{:.4f}".format(displ.std(), displ.mean())
-        print "Resid stddev, mean: {:.4f},{:.4f}".format(resid.std(), resid.mean())
-
-    def plot(self):
-        fig1 = plt.figure(1, figsize=(6, 8))
-        fig2 = plt.figure(2, figsize=(6, 8))
-        make_plots(self.displ_x, self.adj_x['x'],
-                   fig1=fig1, fig2=fig2, clip=self.clip,
-                   save=save + 'X' + '_X')
-
-        fig1 = plt.figure(3, figsize=(6, 8))
-        fig2 = plt.figure(4, figsize=(6, 8))
-        make_plots(displ_ry * scale_ry, adj_ry * scale_ry,
-                            fig1=fig1, fig2=fig2, clip=clip,
-                            save=save + corr_using + '_RY')
-
-        cols = np.linspace(0, displ_x.shape[1], 10).astype(int)
-        cols = (cols[1:] + cols[:-1]) // 2
+        if filename is not None:
+            plt.savefig(filename)
 
 
-def main():
-    pass
+def make_report(ifr):
+    template = jinja2.Template(open('report_template.html').read())
+    src['id'] = ifr.case_id
+    subcases = []
+    axes = ('X',)
+    corrs = ('X',)
+    stats = ('mean', 'std')
+    clips = ('full', 'clip')
 
+    ratios = AutoDict()
+    for axis in axes:
+        for corr in corrs:
+            for stat in stats:
+                for clip in clips:
+                    ratio = (ifr.displ[axis][stat][clip]
+                             / ifr.resid[axis][corr][stat][clip])
+                    ratios[axis][corr][stat][clip] = ratio
+
+    for axis in axes:
+        src['axis'] = axis
+        for corr in corrs:
+            src['corr'] = corr
+            ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
+            ifr.make_scatter_plot(axis, corr, files['scatter.png'].abs)
+            with Ska.File.chdir(files['src_dir'].abs):
+                subcases.append({'img_corr_file': files['img_corr.png'].rel,
+                                 'scatter_file': files['scatter.png'].rel,
+                                 'axis': axis,
+                                 'corr': corr,
+                                 'ratios': ratios[axis][corr],
+                                 'displ': ifr.displ[axis],
+                                 'resid': ifr.resid[axis][corr],
+                                 })
+    out = template.render(subcases=subcases,
+                          title=ifr.title)
+    with open(files['index.html'].abs, 'w') as f:
+        f.write(out)
 
 if __name__ == '__main__':
+    ifr = IfuncsReport()
     make_report()
