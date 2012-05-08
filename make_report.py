@@ -13,13 +13,14 @@ import ifunc
 import calc_scatter
 
 
+AXES = ('X', 'RY')
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 src = pyyaks.context.ContextDict('src')
 files = pyyaks.context.ContextDict('files', basedir='reports')
 files.update({'src_dir': '{{src.id}}',
               'index': '{{src.id}}/index',
               'img_corr': '{{src.id}}/img_{{src.axis}}_corr_{{src.corr}}',
-              'scatter': '{{src.id}}/scatter_{{src.axis}}_corr_{{src.corr}}',
+              'scatter': '{{src.id}}/scatter_corr_{{src.corr}}',
               })
 cache = {}
 
@@ -34,12 +35,20 @@ class AutoDict(dict):
             return value
 
 
-CASES = [dict(ifuncs={'load_func': ifunc.load_ifuncs,
-                      'kwargs': {'case': 'local/10+2/p1000'}},
-              displ={'load_func': ifunc.load_file_legendre,
-                     'kwargs': {'filename': 'data/exemplar_021312.dat'}},
-              case_id='10+2_exemplar',
-              title='10+2 supports with exemplar displacements')]
+CASES = {'10+2_exemplar':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': 'local/10+2/p1000'}},
+                  displ={'load_func': ifunc.load_file_legendre,
+                         'kwargs': {'filename': 'data/exemplar_021312.dat'}},
+                  title='10+2 supports with exemplar displacements'),
+         '10+2_gravity':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': 'local/10+2/p1000'}},
+                  displ={'load_func': ifunc.load_displ_grav,
+                         'kwargs': {'case': 'local/10+2/p1000'}},
+                  case_id='10+2_gravity',
+                  title='10+2 supports with 1-g gravity load'),
+         }
 
 
 class IfuncsReport(object):
@@ -60,33 +69,35 @@ class IfuncsReport(object):
                  clip=20, n_ss=5,
                  node_sep=500, units='um'):
         if ifuncs is None:
-            ifuncs = {'load_func': ifunc.load_ifuncs,
-                      'kwargs': {'case': 'local/10+2/p1000'}}
+            ifuncs = CASES[case_id]['ifuncs']
         if displ is None:
-            displ = {'load_func': ifunc.load_displ_grav,
-                     'kwargs': {'case': 'local/10+2/p1000'}}
+            displ = CASES[case_id]['displ']
 
         self.title = title
         self.case_id = case_id
         self.ifuncs = dict()
         self.displ = AutoDict()
 
-        axes = ('X', 'RY')
         # Check if input ifuncs already has X and RY keys
-        if all(axis in ifuncs for axis in axes):
-            for axis in axes:
+        if all(axis in ifuncs for axis in AXES):
+            for axis in AXES:
                 self.ifuncs[axis] = ifuncs[axis].copy()
         else:  # load ifuncs
-            ifuncs['axis'] = 'X'
-            print 'Loading ifuncs ...'
-            self.ifuncs['X'] = ifuncs['load_func'](**ifuncs['kwargs'])
-            self.ifuncs['RY'] = np.gradient(self.ifuncs['X'], node_sep)[0]
+            print 'Loading ifuncs X...'
+            self.ifuncs['X'] = ifuncs['load_func'](axis='X',
+                                                   **ifuncs['kwargs'])
+            print 'Computing ifuncs RY...'
+            ifx = self.ifuncs['X']
+            ifry = self.ifuncs['RY'] = np.empty_like(self.ifuncs['X'])
+            for i in range(ifx.shape[0]):
+                for j in range(ifx.shape[1]):
+                    ifry[i, j] = np.gradient(ifx[i, j], node_sep)[0]
 
         self.n_ax, self.n_az = self.ifuncs['X'].shape[2:4]
 
         # Check if input displ already has X and RY keys
-        if all(axis in displ for axis in axes):
-            for axis in axes:
+        if all(axis in displ for axis in AXES):
+            for axis in AXES:
                 self.displ[axis]['img']['full'] = \
                     displ[axis]['img']['full'].copy()
         else:  # load displacements
@@ -95,7 +106,7 @@ class IfuncsReport(object):
                 displ['load_func'](self.n_ax, self.n_az, **displ['kwargs'])
 
         # Provide clipped displacements
-        for axis in axes:
+        for axis in AXES:
             self.displ[axis]['img']['clip'] = \
                 self.displ[axis]['img']['full'][clip:-clip, clip:-clip]
 
@@ -112,31 +123,33 @@ class IfuncsReport(object):
         pass
 
     def calc_adj(self):
-        for corr in ('X', 'RY'):
+        for corr in AXES:
             print 'Computing corr coeffs using axis', corr, '...'
             coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
                                        self.displ[corr]['img']['full'],
                                        n_ss=self.n_ss, clip=self.clip)
             self.coeffs[corr] = coeffs
             clip = self.clip
-            for axis in ('X', 'RY'):
+            for axis in AXES:
                 print "Computing adj[{}][{}][full,clip]".format(axis, corr)
                 adj = ifunc.calc_adj_displ(self.ifuncs[axis], coeffs)
                 self.adj[axis][corr]['full'] = adj
                 self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
 
-    def calc_stats(self, axis='X', corr='X'):
-        for clip in ('clip', 'full'):
-            displ = self.displ[axis]['img'][clip]
-            adj = self.adj[axis][corr][clip]
-            resid = displ - adj
+    def calc_stats(self):
+        for axis in AXES:
+            for corr in AXES:
+                for clip in ('clip', 'full'):
+                    displ = self.displ[axis]['img'][clip]
+                    adj = self.adj[axis][corr][clip]
+                    resid = displ - adj
 
-            self.resid[axis][corr]['img'][clip] = resid
-            self.resid[axis][corr]['std'][clip] = resid.std()
-            self.resid[axis][corr]['mean'][clip] = resid.mean()
+                    self.resid[axis][corr]['img'][clip] = resid
+                    self.resid[axis][corr]['std'][clip] = resid.std()
+                    self.resid[axis][corr]['mean'][clip] = resid.mean()
 
-            self.displ[axis]['std'][clip] = displ.std()
-            self.displ[axis]['mean'][clip] = displ.mean()
+                    self.displ[axis]['std'][clip] = displ.std()
+                    self.displ[axis]['mean'][clip] = displ.mean()
 
     def make_scatter_plot(self, axis='X', corr='X', filename=None):
         print 'Calculating scatter displ'
@@ -201,26 +214,25 @@ def make_report(ifr):
     template = jinja2.Template(open('report_template.html').read())
     src['id'] = ifr.case_id
     subcases = []
-    axes = ('X',)
-    corrs = ('X',)
     stats = ('mean', 'std')
     clips = ('full', 'clip')
 
     ratios = AutoDict()
-    for axis in axes:
-        for corr in corrs:
+    for axis in AXES:
+        for corr in AXES:
             for stat in stats:
                 for clip in clips:
                     ratio = (ifr.displ[axis][stat][clip]
                              / ifr.resid[axis][corr][stat][clip])
                     ratios[axis][corr][stat][clip] = ratio
 
-    for axis in axes:
+    for axis in AXES:
         src['axis'] = axis
-        for corr in corrs:
+        for corr in AXES:
             src['corr'] = corr
             ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
-            ifr.make_scatter_plot(axis, corr, files['scatter.png'].abs)
+            if axis == 'X':
+                ifr.make_scatter_plot(axis, corr, files['scatter.png'].abs)
             with Ska.File.chdir(files['src_dir'].abs):
                 subcases.append({'img_corr_file': files['img_corr.png'].rel,
                                  'scatter_file': files['scatter.png'].rel,
