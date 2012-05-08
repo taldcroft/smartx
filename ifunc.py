@@ -2,6 +2,8 @@ import numpy as np
 import scipy.linalg
 from scipy.special import legendre
 
+RAD2ARCSEC = 206000.  # convert to arcsec for better scale
+
 
 def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
     """Calculate the best (least-squared) set of coefficients to

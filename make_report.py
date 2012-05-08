@@ -13,8 +13,8 @@ import ifunc
 import calc_scatter
 
 
-AXES = ('X', 'RY')
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
+AXES = ('X', 'RY')
 src = pyyaks.context.ContextDict('src')
 files = pyyaks.context.ContextDict('files', basedir='reports')
 files.update({'src_dir': '{{src.id}}',
@@ -91,7 +91,8 @@ class IfuncsReport(object):
             ifry = self.ifuncs['RY'] = np.empty_like(self.ifuncs['X'])
             for i in range(ifx.shape[0]):
                 for j in range(ifx.shape[1]):
-                    ifry[i, j] = np.gradient(ifx[i, j], node_sep)[0]
+                    ifry[i, j] = (np.gradient(ifx[i, j], node_sep)[0] *
+                                  RAD2ARCSEC)
 
         self.n_ax, self.n_az = self.ifuncs['X'].shape[2:4]
 
@@ -104,6 +105,7 @@ class IfuncsReport(object):
             print 'Loading displ ...'
             self.displ['X']['img']['full'], self.displ['RY']['img']['full'] = \
                 displ['load_func'](self.n_ax, self.n_az, **displ['kwargs'])
+            self.displ['RY']['img']['full'] *= RAD2ARCSEC
 
         # Provide clipped displacements
         for axis in AXES:
