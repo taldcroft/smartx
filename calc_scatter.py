@@ -18,27 +18,28 @@ def calc_scatter(displ, dx=500, graze_angle=2.0, scale=np.sqrt(2), lam=1.24e-3,
     x = x - x.mean()
     if thetas is None:
         thetas = np.linspace(alpha - theta_max, alpha + theta_max, n_theta)
+    else:
+        thetas = thetas + alpha
     I_scatter = []
 
     print x
     print 'mean(x), std(x)', np.mean(x), np.std(x)
     interp = interp1d(x, displ, kind='cubic', axis=0)
     x_int = np.linspace(x[0], x[-1], n_x)
-    displ_int = interp(x_int)
+    y = interp(x_int)
+    x = x_int.reshape(-1, 1)
 
     for i_theta, theta in enumerate(thetas):
         ampl_sum = 0.0
         d_sin = sin(alpha) - sin(theta)
         d_cos = cos(alpha) + cos(theta)
-        print 'd_sin', d_sin
-        print 'd_cos', d_cos
+        if i_theta % 100 == 0:
+            print i_theta
 
-        for jj in range(n_az):
-            y = displ_int[:, jj]
-            # print 'mean(y), std(y)', np.mean(y), np.std(y)
-            ampl = np.sum(exp(2 * pi * 1j / lam *
-                              (x_int * d_sin - y * d_cos * scale)))
-            ampl_sum += abs(ampl) ** 2
+        ampl = np.sum(exp(2 * pi * 1j / lam *
+                          (x * d_sin - y * d_cos * scale)),
+                      axis=0)
+        ampl_sum = np.sum(abs(ampl) ** 2)
         I_scatter.append(ampl_sum)
 
     return (thetas - thetas.mean()) * RAD2ARCSEC, np.array(I_scatter)
