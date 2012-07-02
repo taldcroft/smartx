@@ -51,6 +51,26 @@ CASES = {'10+2_exemplar':
          }
 
 
+def calc_scatter_stats(theta, scatter):
+    """Return stats about scatter distribution.
+    """
+    i_mid = len(theta) // 2
+    i1 = 2 * i_mid - 1
+    angle = theta[i_mid:i1]
+
+    sym_scatter = scatter[i_mid:i1] + scatter[i_mid - 1:0:-1]
+    sym_scatter /= sym_scatter.sum()
+
+    ee = np.cumsum(sym_scatter)
+    i_hpr = np.searchsorted(ee, 0.5)
+    angle_hpd = angle[i_hpr] * 2
+
+    i99 = np.searchsorted(ee, 0.99)
+    angle_rmsd = 2 * np.sqrt(np.sum(angle[:i99] ** 2 * sym_scatter[:i99])
+                             / np.sum(sym_scatter[:i99]))
+    return angle_hpd, angle_rmsd
+
+
 class IfuncsReport(object):
     """Provide the infrastructure to create a web based report characterizing a
     set of influence functions.
@@ -118,8 +138,11 @@ class IfuncsReport(object):
         self.adj = AutoDict()  # [axis][corr_axis]
         self.resid = AutoDict()  # [clip][type] for clip=('clip'|'full')
                                  # type = ('img'|'std'|'mean')
+        self.scatter = AutoDict()
+
         self.calc_adj()
         self.calc_stats()
+        self.calc_scatter()
 
     def normalize(self, std, axis='X', clip=True):
         pass
@@ -153,17 +176,60 @@ class IfuncsReport(object):
                     self.displ[axis]['std'][clip] = displ.std()
                     self.displ[axis]['mean'][clip] = displ.mean()
 
-    def make_scatter_plot(self, axis='X', corr='X', filename=None):
-        print 'Calculating scatter displ'
-        x, y = calc_scatter.calc_scatter(self.displ[axis]['img']['clip'])
+    def calc_scatter(self, filename=None, n_strips=10):
+        axis = 'X'
+        theta_max = 2.55e-4
+        self.thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
+        n_ss = self.n_az // n_strips
+        for corr in AXES:
+            print 'Calculating scatter displ (input)'
+            displ = self.displ[axis]['img']['clip'][:, ::n_ss]
+            thetas, scatter = calc_scatter.calc_scatter(displ,
+                                                        graze_angle=1.428,
+                                                        thetas=self.thetas)
+            scat = self.scatter['input'][corr]
+            scat['theta'] = thetas
+            scat['vals'] = scatter
+            hpd, rmsd = calc_scatter_stats(thetas, scatter)
+            scat['hpd'] = hpd
+            scat['rmsd'] = rmsd
+
+            print 'Calculating scatter displ (corrected)'
+            displ = self.resid[axis][corr]['img']['clip'][:, ::n_ss]
+            thetas, scatter = calc_scatter.calc_scatter(displ,
+                                                        graze_angle=1.428,
+                                                        thetas=self.thetas)
+            scat = self.scatter['corr'][corr]
+            scat['theta'] = thetas
+            scat['vals'] = scatter
+            hpd, rmsd = calc_scatter_stats(thetas, scatter)
+            scat['hpd'] = hpd
+            scat['rmsd'] = rmsd
+
+    def make_scatter_plot(self, corr='X', filename=None, n_strips=10):
+        print 'Plotting scatter displ'
+
         plt.figure(11, figsize=(5, 3.5))
         plt.clf()
-        plt.plot(x, y, '-b')
-        print 'Calculating scatter resid'
-        x, y = calc_scatter.calc_scatter(self.resid[axis][corr]['img']['clip'])
-        plt.plot(x, y, '-r')
+        plt.rc("legend", fontsize=9)
+
+        scat = self.scatter['input'][corr]
+        label = 'Input HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
+                                                      scat['rmsd'])
+        plt.plot(scat['theta'], scat['vals'], '-b', label=label)
+        x0 = scat['rmsd'] * 2
+
+        scat = self.scatter['corr'][corr]
+        label = 'Corr HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
+                                                      scat['rmsd'])
+        plt.plot(scat['theta'], scat['vals'], '-r', label=label)
+
         plt.xlabel('Arcsec')
         plt.title('Scatter')
+        plt.xlim(-x0, x0)
+        plt.grid()
+        plt.legend(loc='upper left')
+        plt.tight_layout()
         if filename is not None:
             plt.savefig(filename)
 
@@ -211,6 +277,15 @@ class IfuncsReport(object):
         if filename is not None:
             plt.savefig(filename)
 
+    def write_imgs_data(self, axis='X', corr='X', filename=None):
+        resid = self.resid[axis][corr]['img']['full']
+        print 'Writing', filename
+        with open(filename, 'w') as out:
+            for i_az in xrange(self.n_az):
+                for i_ax in xrange(self.n_ax):
+                    out.write('{:5d} {:5d} {:f}\n'
+                              .format(i_az, i_ax, resid[i_ax, i_az]))
+
 
 def make_report(ifr):
     template = jinja2.Template(open('report_template.html').read())
@@ -233,8 +308,9 @@ def make_report(ifr):
         for corr in AXES:
             src['corr'] = corr
             ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
+            ifr.write_imgs_data(axis, corr, files['img_corr.dat'].abs)
             if axis == 'X':
-                ifr.make_scatter_plot(axis, corr, files['scatter.png'].abs)
+                ifr.make_scatter_plot(corr, files['scatter.png'].abs)
             with Ska.File.chdir(files['src_dir'].abs):
                 subcases.append({'img_corr_file': files['img_corr.png'].rel,
                                  'scatter_file': files['scatter.png'].rel,
