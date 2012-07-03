@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 
 import numpy as np
@@ -35,7 +37,13 @@ class AutoDict(dict):
             return value
 
 
-CASES = {'10+2_exemplar':
+CASES = {'10+0_half_exemplar':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_half/p1000'}},
+                  displ={'load_func': ifunc.load_file_legendre,
+                         'kwargs': {'filename': 'data/exemplar_021312.dat'}},
+                  title='10+0_half with exemplar displacements'),
+         '10+2_exemplar':
              dict(ifuncs={'load_func': ifunc.load_ifuncs,
                           'kwargs': {'case': 'local/10+2/p1000'}},
                   displ={'load_func': ifunc.load_file_legendre,
@@ -84,9 +92,9 @@ class IfuncsReport(object):
     :param units: units
     """
     def __init__(self, ifuncs=None, displ=None,
-                 case_id='10+2_gravity',
-                 title='10+2 supports with 1-g gravity load',
-                 clip=20, n_ss=5,
+                 case_id='10+2_exemplar',
+                 title='10+2 supports with exemplar displacements',
+                 clip=20, n_ss=5, piston_tilt=True,
                  node_sep=500, units='um'):
         if ifuncs is None:
             ifuncs = CASES[case_id]['ifuncs']
@@ -97,6 +105,7 @@ class IfuncsReport(object):
         self.case_id = case_id
         self.ifuncs = dict()
         self.displ = AutoDict()
+        self.piston_tilt = piston_tilt
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -176,11 +185,17 @@ class IfuncsReport(object):
                     self.displ[axis]['std'][clip] = displ.std()
                     self.displ[axis]['mean'][clip] = displ.mean()
 
-    def calc_scatter(self, filename=None, n_strips=10):
+    def calc_scatter(self, filename=None, n_strips=9):
         axis = 'X'
         theta_max = 2.55e-4
         self.thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
         n_ss = self.n_az // n_strips
+
+        resid = self.resid['X']['RY']['img']['full']
+        cols = np.linspace(0, resid.shape[1], 10).astype(int)
+        cols = (cols[1:] + cols[:-1]) // 2
+        np.save('resid_X_RY.npy', resid[::2, cols])
+
         for corr in AXES:
             print 'Calculating scatter displ (input)'
             displ = self.displ[axis]['img']['clip'][:, ::n_ss]
@@ -196,6 +211,9 @@ class IfuncsReport(object):
 
             print 'Calculating scatter displ (corrected)'
             displ = self.resid[axis][corr]['img']['clip'][:, ::n_ss]
+            if self.piston_tilt:  # Remove piston and tilt
+                remove_piston_tilt(displ)
+
             thetas, scatter = calc_scatter.calc_scatter(displ,
                                                         graze_angle=1.428,
                                                         thetas=self.thetas)
@@ -206,7 +224,7 @@ class IfuncsReport(object):
             scat['hpd'] = hpd
             scat['rmsd'] = rmsd
 
-    def make_scatter_plot(self, corr='X', filename=None, n_strips=10):
+    def make_scatter_plot(self, corr='X', filename=None, n_strips=9):
         print 'Plotting scatter displ'
 
         plt.figure(11, figsize=(5, 3.5))
@@ -287,6 +305,15 @@ class IfuncsReport(object):
                               .format(i_az, i_ax, resid[i_ax, i_az]))
 
 
+def remove_piston_tilt(displ):
+    """Remove piston and tilt independently from each axial strip in ``displ``.
+    """
+    x = np.arange(len(displ))
+    ps = np.polyfit(x, displ, 1)
+    for i in range(displ.shape[1]):
+        displ[:, i] -= np.polyval(ps[:, i], x)
+
+
 def make_report(ifr):
     template = jinja2.Template(open('report_template.html').read())
     src['id'] = ifr.case_id
@@ -307,6 +334,8 @@ def make_report(ifr):
         src['axis'] = axis
         for corr in AXES:
             src['corr'] = corr
+            if not os.path.exists(files['src_dir'].abs):
+                os.makedirs(files['src_dir'].abs)
             ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
             ifr.write_imgs_data(axis, corr, files['img_corr.dat'].abs)
             if axis == 'X':
@@ -325,6 +354,35 @@ def make_report(ifr):
     with open(files['index.html'].abs, 'w') as f:
         f.write(out)
 
+
+def get_args():
+    import argparse
+    parser = argparse.ArgumentParser(description='Make report')
+    parser.add_argument('--case-id',
+                        type=str,
+                        default='10+0_half_exemplar',
+                        help='Case ID')
+    parser.add_argument('--clip',
+                        type=int, default=20,
+                        help='Edge clippping')
+    parser.add_argument('--ss',
+                        type=int, default=5,
+                        help='Sub-sampling')
+    parser.add_argument('--piston-tilt',
+                        type=int, default=1,
+                        help='Sub-sampling')
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == '__main__':
-    ifr = IfuncsReport()
-    make_report()
+    args = get_args()
+    ifr = IfuncsReport(case_id=args.case_id, clip=args.clip, n_ss=args.ss,
+                       piston_tilt=bool(args.piston_tilt))
+    make_report(ifr)
+
+    # def __init__(self, ifuncs=None, displ=None,
+    #              case_id='10+2_exemplar',
+    #              title='10+2 supports with exemplar displacements',
+    #              clip=20, n_ss=5,
+    #              node_sep=500, units='um'):

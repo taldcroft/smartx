@@ -21,7 +21,7 @@ if 'ifuncs_x' not in globals() or 'ifuncs_ry' not in globals():
 if 1:
     displ_x = calc_adj.load_file_legendre(
         ifuncs_x, slope=False, filename='data/exemplar_021312.dat')
-    save = 'exemplar_'
+    save = 'exemplar2_'
 else:
     displ_x = calc_adj.load_displ_legendre(ifuncs_x, 8, 4, 0.5)
     save = 'leg84_'
@@ -64,8 +64,12 @@ cols = np.linspace(0, displ_x.shape[1], 10).astype(int)
 cols = (cols[1:] + cols[:-1]) // 2
 
 if save:
-    resid  = displ_x - adj_x
-    np.savetxt(save + corr_using + '_resid_X.dat', resid[::2, cols], fmt='%8.5f')
+    resid = displ_x - adj_x
+    np.savetxt(save + corr_using + '_resid_X.dat', resid[::2, cols],
+               fmt='%8.5f')
 
     resid = displ_ry - adj_ry
-    np.savetxt(save + corr_using + '_resid_RY.dat', resid[::2, cols], fmt='%9.6f')
+    np.savetxt(save + corr_using + '_resid_RY.dat', resid[::2, cols],
+               fmt='%9.6f')
+
+    np.savetxt(save + 'uncorr_X.dat', displ_x[::2, cols], fmt='%8.5f')
