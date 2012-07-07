@@ -22,7 +22,7 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
         ifuncs = ifuncs[:, :, clip:-clip, clip:-clip]
 
     # Squash first two dimensions (20x20) of ifuncs into one (400)
-    n_ax, n_az = ifuncs.shape[2:4]
+    n_ax, n_az = ifuncs.shape[-2:]
     M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
 
     # Sub-sample by n_ss along axial and aximuthal axes.  This uses
@@ -55,7 +55,7 @@ def calc_adj_displ(ifuncs, coeffs):
     """Return the adjusted displacement as a 2-d array for the given ``ifuncs``
     and ``coeffs``.
     """
-    n_ax, n_az = ifuncs.shape[2:4]
+    n_ax, n_az = ifuncs.shape[-2:]
     M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
     M_2d_all = M_3d_all.reshape(M_3d_all.shape[0], -1).transpose()
     adj = M_2d_all.dot(coeffs)
