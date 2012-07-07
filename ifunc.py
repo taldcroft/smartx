@@ -19,7 +19,7 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
     # Clip boundaries
     if clip:
         displ = displ[clip:-clip, clip:-clip]
-        ifuncs = ifuncs[:, :, clip:-clip, clip:-clip]
+        ifuncs = ifuncs[..., clip:-clip, clip:-clip]
 
     # Squash first two dimensions (20x20) of ifuncs into one (400)
     n_ax, n_az = ifuncs.shape[-2:]

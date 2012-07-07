@@ -95,7 +95,9 @@ class IfuncsReport(object):
                  case_id='10+2_exemplar',
                  subcase_id=1,
                  clip=20, n_ss=5, piston_tilt=True,
-                 node_sep=500, units='um'):
+                 node_sep=500, units='um',
+                 displ_axes=None,
+                 corr_axes=None):
 
         case = CASES[case_id]
         ifuncs = case['ifuncs']
@@ -111,6 +113,8 @@ class IfuncsReport(object):
         self.displ_kwargs = displ['kwargs']
         self.node_sep = node_sep
         self.units = units
+        self.displ_axes = displ_axes or AXES
+        self.corr_axes = corr_axes or AXES
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -121,14 +125,13 @@ class IfuncsReport(object):
             self.ifuncs['X'] = ifuncs['load_func'](axis='X',
                                                    **ifuncs['kwargs'])
             print 'Computing ifuncs RY...'
-            ifx = self.ifuncs['X']
-            ifry = self.ifuncs['RY'] = np.empty_like(self.ifuncs['X'])
+            n_ax, n_az = self.ifuncs['X'].shape[-2:]
+            ifx = self.ifuncs['X'] = self.ifuncs['X'].reshape(-1, n_ax, n_az)
+            ifry = self.ifuncs['RY'] = np.empty_like(ifx)
             for i in range(ifx.shape[0]):
-                for j in range(ifx.shape[1]):
-                    ifry[i, j] = (np.gradient(ifx[i, j], node_sep)[0] *
-                                  RAD2ARCSEC)
+                ifry[i] = np.gradient(ifx[i], node_sep)[0] * RAD2ARCSEC
 
-        self.n_ax, self.n_az = self.ifuncs['X'].shape[2:4]
+        self.n_ax, self.n_az = self.ifuncs['X'].shape[-2:]
 
         # Check if input displ already has X and RY keys
         if all(axis in displ for axis in AXES):
@@ -162,22 +165,22 @@ class IfuncsReport(object):
         pass
 
     def calc_adj(self):
-        for corr in AXES:
+        for corr in self.corr_axes:
             print 'Computing corr coeffs using axis', corr, '...'
             coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
                                        self.displ[corr]['img']['full'],
                                        n_ss=self.n_ss, clip=self.clip)
             self.coeffs[corr] = coeffs
             clip = self.clip
-            for axis in AXES:
+            for axis in self.displ_axes:
                 print "Computing adj[{}][{}][full,clip]".format(axis, corr)
                 adj = ifunc.calc_adj_displ(self.ifuncs[axis], coeffs)
                 self.adj[axis][corr]['full'] = adj
                 self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
 
     def calc_stats(self):
-        for axis in AXES:
-            for corr in AXES:
+        for axis in self.displ_axes:
+            for corr in self.corr_axes:
                 for clip in ('clip', 'full'):
                     displ = self.displ[axis]['img'][clip]
                     adj = self.adj[axis][corr][clip]
@@ -201,7 +204,7 @@ class IfuncsReport(object):
         cols = (cols[1:] + cols[:-1]) // 2
         np.save('resid_X_RY.npy', resid[::2, cols])
 
-        for corr in AXES:
+        for corr in self.corr_axes:
             print 'Calculating scatter displ (input)'
             displ = self.displ[axis]['img']['clip'][:, ::n_ss]
             thetas, scatter = calc_scatter.calc_scatter(displ,
@@ -331,17 +334,17 @@ def make_report(ifr):
     clips = ('full', 'clip')
 
     ratios = AutoDict()
-    for axis in AXES:
-        for corr in AXES:
+    for axis in ifr.displ_axes:
+        for corr in ifr.corr_axes:
             for stat in stats:
                 for clip in clips:
                     ratio = (ifr.displ[axis][stat][clip]
                              / ifr.resid[axis][corr][stat][clip])
                     ratios[axis][corr][stat][clip] = ratio
 
-    for axis in AXES:
+    for axis in ifr.displ_axes:
         src['axis'] = axis
-        for corr in AXES:
+        for corr in ifr.corr_axes:
             src['corr'] = corr
             ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
             ifr.write_imgs_data(axis, corr, files['img_corr.dat'].abs)
@@ -382,15 +385,25 @@ def get_args():
     parser.add_argument('--piston-tilt',
                         type=int, default=1,
                         help='Sub-sampling')
+    parser.add_argument('--displ-axes',
+                        type=str, default="X,RY",
+                        help='Displacement axes to compute')
+    parser.add_argument('--corr-axes',
+                        type=str, default="X,RY",
+                        help='Correction axes to compute')
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
     args = get_args()
+    displ_axes = args.displ_axes.split(',')
+    corr_axes = args.corr_axes.split(',')
     ifr = IfuncsReport(case_id=args.case_id, subcase_id=args.subcase_id,
                        clip=args.clip, n_ss=args.ss,
-                       piston_tilt=bool(args.piston_tilt))
+                       piston_tilt=bool(args.piston_tilt),
+                       displ_axes=displ_axes,
+                       corr_axes=corr_axes)
     make_report(ifr)
 
     # def __init__(self, ifuncs=None, displ=None,
