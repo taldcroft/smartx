@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import jinja2
 import Ska.File
@@ -93,19 +93,24 @@ class IfuncsReport(object):
     """
     def __init__(self, ifuncs=None, displ=None,
                  case_id='10+2_exemplar',
-                 title='10+2 supports with exemplar displacements',
+                 subcase_id=1,
                  clip=20, n_ss=5, piston_tilt=True,
                  node_sep=500, units='um'):
-        if ifuncs is None:
-            ifuncs = CASES[case_id]['ifuncs']
-        if displ is None:
-            displ = CASES[case_id]['displ']
 
-        self.title = title
+        case = CASES[case_id]
+        ifuncs = case['ifuncs']
+        displ = case['displ']
+
+        self.title = case['title']
         self.case_id = case_id
+        self.subcase_id = subcase_id
         self.ifuncs = dict()
         self.displ = AutoDict()
         self.piston_tilt = piston_tilt
+        self.ifuncs_kwargs = ifuncs['kwargs']
+        self.displ_kwargs = displ['kwargs']
+        self.node_sep = node_sep
+        self.units = units
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -231,10 +236,12 @@ class IfuncsReport(object):
         plt.clf()
         plt.rc("legend", fontsize=9)
 
+        scale = (np.max(self.scatter['corr'][corr]['vals']) /
+                 np.max(self.scatter['input'][corr]['vals'])) / 2.0
         scat = self.scatter['input'][corr]
         label = 'Input HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
                                                       scat['rmsd'])
-        plt.plot(scat['theta'], scat['vals'], '-b', label=label)
+        plt.plot(scat['theta'], scat['vals'] * scale, '-b', label=label)
         x0 = scat['rmsd'] * 2
 
         scat = self.scatter['corr'][corr]
@@ -316,7 +323,9 @@ def remove_piston_tilt(displ):
 
 def make_report(ifr):
     template = jinja2.Template(open('report_template.html').read())
-    src['id'] = ifr.case_id
+    src['id'] = '{}/{}'.format(ifr.case_id, ifr.subcase_id)
+    if not os.path.exists(files['src_dir'].abs):
+        os.makedirs(files['src_dir'].abs)
     subcases = []
     stats = ('mean', 'std')
     clips = ('full', 'clip')
@@ -334,8 +343,6 @@ def make_report(ifr):
         src['axis'] = axis
         for corr in AXES:
             src['corr'] = corr
-            if not os.path.exists(files['src_dir'].abs):
-                os.makedirs(files['src_dir'].abs)
             ifr.make_imgs_plot(axis, corr, files['img_corr.png'].abs)
             ifr.write_imgs_data(axis, corr, files['img_corr.dat'].abs)
             if axis == 'X':
@@ -350,7 +357,7 @@ def make_report(ifr):
                                  'resid': ifr.resid[axis][corr],
                                  })
     out = template.render(subcases=subcases,
-                          title=ifr.title)
+                          ifr=ifr)
     with open(files['index.html'].abs, 'w') as f:
         f.write(out)
 
@@ -362,6 +369,10 @@ def get_args():
                         type=str,
                         default='10+0_half_exemplar',
                         help='Case ID')
+    parser.add_argument('--subcase-id',
+                        type=str,
+                        default='1',
+                        help='Sub-case ID')
     parser.add_argument('--clip',
                         type=int, default=20,
                         help='Edge clippping')
@@ -377,7 +388,8 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    ifr = IfuncsReport(case_id=args.case_id, clip=args.clip, n_ss=args.ss,
+    ifr = IfuncsReport(case_id=args.case_id, subcase_id=args.subcase_id,
+                       clip=args.clip, n_ss=args.ss,
                        piston_tilt=bool(args.piston_tilt))
     make_report(ifr)
 
