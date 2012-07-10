@@ -59,7 +59,8 @@ class AdjOpticsCase(object):
                  clip=20, n_ss=5, piston_tilt=True,
                  node_sep=500, units='um',
                  displ_axes=None,
-                 corr_axes=None):
+                 corr_axes=None,
+                 n_proc=4):
 
         case = CASES[case_id]
         ifuncs = case['ifuncs']
@@ -77,6 +78,7 @@ class AdjOpticsCase(object):
         self.units = units
         self.displ_axes = displ_axes or AXES
         self.corr_axes = corr_axes or AXES
+        self.n_proc = n_proc
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -119,10 +121,6 @@ class AdjOpticsCase(object):
                                  # type = ('img'|'std'|'mean')
         self.scatter = AutoDict()
 
-        self.calc_adj()
-        self.calc_stats()
-        self.calc_scatter()
-
     def normalize(self, std, axis='X', clip=True):
         pass
 
@@ -164,14 +162,13 @@ class AdjOpticsCase(object):
         resid = self.resid['X']['RY']['img']['full']
         cols = np.linspace(0, resid.shape[1], 10).astype(int)
         cols = (cols[1:] + cols[:-1]) // 2
-        np.save('resid_X_RY.npy', resid[::2, cols])
 
         for corr in self.corr_axes:
             print 'Calculating scatter displ (input)'
             displ = self.displ[axis]['img']['clip'][:, ::n_ss]
-            thetas, scatter = calc_scatter.calc_scatter(displ,
-                                                        graze_angle=1.428,
-                                                        thetas=self.thetas)
+            thetas, scatter = calc_scatter.calc_scatter(
+                displ, graze_angle=1.428, thetas=self.thetas,
+                n_proc=self.n_proc)
             scat = self.scatter['input'][corr]
             scat['theta'] = thetas
             scat['vals'] = scatter
@@ -186,7 +183,8 @@ class AdjOpticsCase(object):
 
             thetas, scatter = calc_scatter.calc_scatter(displ,
                                                         graze_angle=1.428,
-                                                        thetas=self.thetas)
+                                                        thetas=self.thetas,
+                                                        n_proc=self.n_proc)
             scat = self.scatter['corr'][corr]
             scat['theta'] = thetas
             scat['vals'] = scatter

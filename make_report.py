@@ -115,6 +115,10 @@ def make_report(aoc):
     stats = ('mean', 'std')
     clips = ('full', 'clip')
 
+    aoc.calc_adj()
+    aoc.calc_stats()
+    aoc.calc_scatter()
+
     ratios = AutoDict()
     for axis in aoc.displ_axes:
         for corr in aoc.corr_axes:
@@ -186,4 +190,5 @@ if __name__ == '__main__':
                         piston_tilt=bool(args.piston_tilt),
                         displ_axes=displ_axes,
                         corr_axes=corr_axes)
+
     make_report(aoc)

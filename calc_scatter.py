@@ -1,7 +1,6 @@
 import numpy as np
 from numpy import pi, sin, cos, exp, abs
 from scipy.interpolate import interp1d
-from multiprocessing import Pool
 
 RAD2ARCSEC = 180. * 3600. / pi  # convert to arcsec for better scale
 
@@ -50,8 +49,13 @@ def calc_scatter(displ, dx=500, graze_angle=2.0, scale=np.sqrt(2), lam=1.24e-3,
     x = x_int.reshape(-1, 1)
 
     calc_func = CalcScatter(alpha, x, y, scale, lam)
-    pool = Pool(processes=n_proc)
-    I_scatter = pool.map(calc_func, list(thetas))
-    I_scatter /= np.sum(I_scatter)
+    if n_proc:
+        from multiprocessing import Pool
+        pool = Pool(processes=n_proc)
+        I_scatter = pool.map(calc_func, list(thetas))
+    else:
+        I_scatter = [calc_func(x) for x in thetas]
+
+    I_scatter = np.array(I_scatter) / np.sum(I_scatter)
 
     return (thetas - thetas.mean()) * RAD2ARCSEC, np.array(I_scatter)
