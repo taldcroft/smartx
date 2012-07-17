@@ -1,0 +1,31 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <link rel="stylesheet" HREF="ccosmos.css" TYPE="text/css" >
+    <title>AXO</title>
+  </head>
+
+  <body>
+    <h1>Adjustable X-ray Optics influence functions cases</h1>
+
+    <table>
+      <tr>
+        <th>Case ID</th>     
+        <th>Sub-case ID</th> 
+        <th>Clip</th>        
+        <th>N subsample</th> 
+        <th>Piston-tilt</th>
+      </tr>
+      {% for aoc in aocs %}
+        <tr>
+           <td>{{aoc.case_id}}</td>     
+           <td><a href="{{aoc.link}}"> {{aoc.subcase_id}} </a></td>  
+           <td>{{aoc.clip}}</td>        
+           <td>{{aoc.n_ss}}</td>        
+           <td>{{aoc.piston_tilt}}</td>
+        </tr>
+      {% endfor %}
+    </table>
+
+  </body>
+</html>

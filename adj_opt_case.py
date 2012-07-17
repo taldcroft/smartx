@@ -154,30 +154,31 @@ class AdjOpticsCase(object):
                     self.displ[axis]['mean'][clip] = displ.mean()
 
     def calc_scatter(self, filename=None, n_strips=9):
-        axis = 'X'
         theta_max = 2.55e-4
         self.thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
-        n_ss = self.n_az // n_strips
 
-        resid = self.resid['X']['RY']['img']['full']
-        cols = np.linspace(0, resid.shape[1], 10).astype(int)
+        # Compute the column position of axial strips
+        displ = self.displ['X']['img']['clip']
+        cols = np.linspace(0, displ.shape[1], n_strips + 1).astype(int)
         cols = (cols[1:] + cols[:-1]) // 2
 
+        print 'Calculating scatter displ (input)'
+        displ = self.displ['X']['img']['clip'][:, cols]
+        thetas, scatter = calc_scatter.calc_scatter(
+            displ, graze_angle=1.428, thetas=self.thetas,
+            n_proc=self.n_proc)
+        scat = self.scatter['input']
+        scat['img'] = displ.copy()
+        scat['theta'] = thetas
+        scat['vals'] = scatter
+        hpd, rmsd = calc_scatter_stats(thetas, scatter)
+        scat['hpd'] = hpd
+        scat['rmsd'] = rmsd
+
         for corr in self.corr_axes:
-            print 'Calculating scatter displ (input)'
-            displ = self.displ[axis]['img']['clip'][:, ::n_ss]
-            thetas, scatter = calc_scatter.calc_scatter(
-                displ, graze_angle=1.428, thetas=self.thetas,
-                n_proc=self.n_proc)
-            scat = self.scatter['input'][corr]
-            scat['theta'] = thetas
-            scat['vals'] = scatter
-            hpd, rmsd = calc_scatter_stats(thetas, scatter)
-            scat['hpd'] = hpd
-            scat['rmsd'] = rmsd
 
             print 'Calculating scatter displ (corrected)'
-            displ = self.resid[axis][corr]['img']['clip'][:, ::n_ss]
+            displ = self.resid['X'][corr]['img']['clip'][:, cols]
             if self.piston_tilt:  # Remove piston and tilt
                 remove_piston_tilt(displ)
 
@@ -186,6 +187,7 @@ class AdjOpticsCase(object):
                                                         thetas=self.thetas,
                                                         n_proc=self.n_proc)
             scat = self.scatter['corr'][corr]
+            scat['img'] = displ.copy()
             scat['theta'] = thetas
             scat['vals'] = scatter
             hpd, rmsd = calc_scatter_stats(thetas, scatter)

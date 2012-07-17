@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import cPickle as pickle
 
 import numpy as np
 import matplotlib
@@ -16,7 +17,11 @@ src = pyyaks.context.ContextDict('src')
 files = pyyaks.context.ContextDict('files', basedir='reports')
 files.update({'src_dir': '{{src.id}}',
               'index': '{{src.id}}/index',
+              'aoc': '{{src.id}}/aoc',
               'img_corr': '{{src.id}}/img_{{src.axis}}_corr_{{src.corr}}',
+              'img_scatter': ('{{src.id}}/img_scatter_{{src.scatter_type}}'
+                              '_corr_{{src.corr}}'),
+              'axial_resid': '{{src.id}}/axial_resid_{{src.corr}}',
               'scatter': '{{src.id}}/scatter_corr_{{src.corr}}',
               })
 
@@ -29,8 +34,8 @@ def make_scatter_plot(aoc, corr='X', filename=None, n_strips=9):
     plt.rc("legend", fontsize=9)
 
     scale = (np.max(aoc.scatter['corr'][corr]['vals']) /
-             np.max(aoc.scatter['input'][corr]['vals'])) / 2.0
-    scat = aoc.scatter['input'][corr]
+             np.max(aoc.scatter['input']['vals'])) / 2.0
+    scat = aoc.scatter['input']
     label = 'Input HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
                                                   scat['rmsd'])
     plt.plot(scat['theta'], scat['vals'] * scale, '-b', label=label)
@@ -46,6 +51,23 @@ def make_scatter_plot(aoc, corr='X', filename=None, n_strips=9):
     plt.xlim(-x0, x0)
     plt.grid()
     plt.legend(loc='upper left')
+    plt.tight_layout()
+    if filename is not None:
+        plt.savefig(filename)
+
+
+def make_axial_resid_plot(aoc, corr='X', filename=None):
+    print 'Plotting axial residuals'
+
+    plt.figure(12, figsize=(5, 3.5))
+    plt.clf()
+
+    displ = aoc.scatter['corr'][corr]['img']
+    plt.plot(displ)
+    plt.xlabel('Axial pixel')
+    plt.ylabel('X residual (um)')
+    plt.title('Axial strip residuals corrected on {}'.format(corr))
+    plt.grid()
     plt.tight_layout()
     if filename is not None:
         plt.savefig(filename)
@@ -96,6 +118,19 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
         plt.savefig(filename)
 
 
+def write_scatter_data(aoc, corr, scatter_type, filename):
+    """Write image used in scatter intensity calculation.  This image consists
+    of a small(ish) number of axial strips that might have been corrected for
+    piston and tilt.
+    """
+    print 'Writing', filename
+    if scatter_type == 'input':
+        img = aoc.scatter['input']['img']
+    else:
+        img = aoc.scatter[scatter_type][corr]['img']
+    np.savetxt(filename, img, fmt='%8.5f')
+
+
 def write_imgs_data(aoc, axis='X', corr='X', filename=None):
     resid = aoc.resid[axis][corr]['img']['full']
     print 'Writing', filename
@@ -128,27 +163,40 @@ def make_report(aoc):
                              / aoc.resid[axis][corr][stat][clip])
                     ratios[axis][corr][stat][clip] = ratio
 
-    for axis in aoc.displ_axes:
-        src['axis'] = axis
-        for corr in aoc.corr_axes:
-            src['corr'] = corr
+    for corr in aoc.corr_axes:
+        src['corr'] = corr
+        src['axis'] = 'X'
+        for scatter_type in ('input', 'corr'):
+            src['scatter_type'] = scatter_type
+            write_scatter_data(aoc, corr, scatter_type,
+                               files['img_scatter.dat'].abs)
+
+        make_scatter_plot(aoc, corr, files['scatter.png'].abs)
+        make_axial_resid_plot(aoc, corr, files['axial_resid.png'].abs)
+
+        for axis in aoc.displ_axes:
+            src['axis'] = axis
             make_imgs_plot(aoc, axis, corr, files['img_corr.png'].abs)
             write_imgs_data(aoc, axis, corr, files['img_corr.dat'].abs)
-            if axis == 'X':
-                make_scatter_plot(aoc, corr, files['scatter.png'].abs)
             with Ska.File.chdir(files['src_dir'].abs):
-                subcases.append({'img_corr_file': files['img_corr.png'].rel,
-                                 'scatter_file': files['scatter.png'].rel,
-                                 'axis': axis,
-                                 'corr': corr,
-                                 'ratios': ratios[axis][corr],
-                                 'displ': aoc.displ[axis],
-                                 'resid': aoc.resid[axis][corr],
-                                 })
+                subcases.append(
+                    {'img_corr_file': files['img_corr.png'].rel,
+                     'scatter_file': files['scatter.png'].rel,
+                     'axial_resid_file': files['axial_resid.png'].rel,
+                     'axis': axis,
+                     'corr': corr,
+                     'ratios': ratios[axis][corr],
+                     'displ': aoc.displ[axis],
+                     'resid': aoc.resid[axis][corr],
+                     })
     out = template.render(subcases=subcases,
                           aoc=aoc)
     with open(files['index.html'].abs, 'w') as f:
         f.write(out)
+
+    # Save version of aoc without ifuncs, which are not interesting and big
+    delattr(aoc, 'ifuncs')
+    pickle.dump(aoc, open(files['aoc.pkl'].rel, 'w'), protocol=-1)
 
 
 def get_args():

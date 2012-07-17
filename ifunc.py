@@ -95,7 +95,24 @@ def load_displ_grav(n_ax, n_az, case='10+2/p1000'):
     return displ_x, displ_ry
 
 
-def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat'):
+def get_mount_map(n_ax, n_az):
+    phase_az = np.linspace(0.0, 5 * 2 * np.pi, n_az)
+    ampl_az = np.cos(phase_az)
+    ampl_ax = np.zeros(n_ax, dtype=np.float)
+    i_trans = int(n_ax * 0.15)
+    phase_ax = np.linspace(0, np.pi, i_trans)
+    ampl_ax[:i_trans] = (np.cos(phase_ax) + 1) / 2.0
+    ampl_ax[-i_trans:] = ampl_ax[i_trans - 1::-1]
+
+    mount_map = np.empty((n_ax, n_az), dtype=np.float)
+    for i in range(n_ax):
+        mount_map[i, :] = (1 + ampl_az * ampl_ax[i]) / (1 + ampl_ax[i])
+
+    return mount_map
+
+
+def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat',
+                       apply_10_0=True):
     lines = (line.strip() for line in open(filename, 'rb')
              if not line.startswith('#'))
     D = np.array([[float(val) for val in line.split()]
@@ -129,6 +146,11 @@ def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat'):
     #             Y_az_ax[iy, ix] += Pn_y[n, iy] * sum_Pm
 
     displ_x = Y_az_ax  # microns
+
+    if apply_10_0:
+        mount_map = get_mount_map(n_ax, n_az)
+        displ_x = displ_x * mount_map
+
     # 0.5 mm spacing * 1000 um / mm
     displ_ry = np.gradient(Y_az_ax, 0.5 * 1000)[0]  # radians
 
@@ -142,3 +164,6 @@ def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0):
     displ_ry = np.gradient(displ_x, 0.5 * 1000)[0]  # radians
 
     return displ_x, displ_ry
+
+def load_displ_10_0(n_ax, n_az, ord_ax=2, ord_az=1):
+    pass
