@@ -26,7 +26,7 @@ files.update({'src_dir': '{{src.id}}',
               })
 
 
-def make_scatter_plot(aoc, corr='X', filename=None, n_strips=9):
+def make_scatter_plot(aoc, corr='X', filename=None):
     print 'Plotting scatter displ'
 
     plt.figure(11, figsize=(5, 3.5))
@@ -84,6 +84,7 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     n_clip = aoc.clip
     clipbox_x = [n_clip, nx - n_clip, nx - n_clip, n_clip, n_clip]
     clipbox_y = [n_clip, n_clip, ny - n_clip, ny - n_clip, n_clip]
+    scatter_x = aoc.scatter['cols'] + n_clip
 
     plt.figure(10, figsize=(6, 8))
     plt.clf()
@@ -114,6 +115,8 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     ax.autoscale(enable=False)
     plt.plot(clipbox_x, clipbox_y, '-m')
     plt.colorbar(fraction=0.07)
+    for x in scatter_x:
+        plt.plot([x, x], [n_clip, ny - n_clip], '-m')
     if filename is not None:
         plt.savefig(filename)
 
@@ -216,6 +219,9 @@ def get_args():
     parser.add_argument('--ss',
                         type=int, default=5,
                         help='Sub-sampling')
+    parser.add_argument('--n-strips',
+                        type=int, default=9,
+                        help='Number of strips for scatter calculation')
     parser.add_argument('--piston-tilt',
                         type=int, default=1,
                         help='Sub-sampling')
@@ -236,6 +242,7 @@ if __name__ == '__main__':
     aoc = AdjOpticsCase(case_id=args.case_id, subcase_id=args.subcase_id,
                         clip=args.clip, n_ss=args.ss,
                         piston_tilt=bool(args.piston_tilt),
+                        n_strips=args.n_strips,
                         displ_axes=displ_axes,
                         corr_axes=corr_axes)
 

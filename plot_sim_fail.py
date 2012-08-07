@@ -32,7 +32,7 @@ yvals = vals['hpd'] + yr
 
 plt.clf()
 plt.plot(xvals, yvals, ',', mec='b', mfc='b')
-plt.plot([0.0], [0.74], 'xb', mew=3, ms=10)
+plt.plot([0.0], [1.22], 'xb', mew=3, ms=10)
 
 ok = n_edge >= np.sqrt(vals['n_fail'])
 plt.plot(xvals[ok], yvals[ok], '.', mfc='r', mec='r',
@@ -45,4 +45,3 @@ plt.title("HPD vs. actuator failures in manufacturing")
 plt.legend(loc='best')
 
 plt.savefig('reports/10+0_half_exemplar/1/act_fail_manuf.png')
-

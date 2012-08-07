@@ -50,6 +50,7 @@ class AdjOpticsCase(object):
     :param case_id: case identifier string for report naming
     :param clip: number of rows / columns from edge to clip
     :param n_ss: sub-sample period (use 1 out of n_ss rows/columns)
+    :param n_strips: number of axial strips for scatter calculation
     :param node_sep: node separation (microns)
     :param units: units
     """
@@ -60,7 +61,8 @@ class AdjOpticsCase(object):
                  node_sep=500, units='um',
                  displ_axes=None,
                  corr_axes=None,
-                 n_proc=4):
+                 n_proc=4,
+                 n_strips=9):
 
         case = CASES[case_id]
         ifuncs = case['ifuncs']
@@ -79,6 +81,7 @@ class AdjOpticsCase(object):
         self.displ_axes = displ_axes or AXES
         self.corr_axes = corr_axes or AXES
         self.n_proc = n_proc
+        self.n_strips = n_strips
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -153,30 +156,31 @@ class AdjOpticsCase(object):
                     self.displ[axis]['std'][clip] = displ.std()
                     self.displ[axis]['mean'][clip] = displ.mean()
 
-    def calc_scatter(self, filename=None, n_strips=9):
+    def calc_scatter(self, filename=None, calc_input=True):
         theta_max = 2.55e-4
         self.thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
 
         # Compute the column position of axial strips
         displ = self.displ['X']['img']['clip']
-        cols = np.linspace(0, displ.shape[1], n_strips + 1).astype(int)
+        cols = np.linspace(0, displ.shape[1], self.n_strips + 1).astype(int)
         cols = (cols[1:] + cols[:-1]) // 2
+        self.scatter['cols'] = cols
 
-        print 'Calculating scatter displ (input)'
-        displ = self.displ['X']['img']['clip'][:, cols]
-        thetas, scatter = calc_scatter.calc_scatter(
-            displ, graze_angle=1.428, thetas=self.thetas,
-            n_proc=self.n_proc)
-        scat = self.scatter['input']
-        scat['img'] = displ.copy()
-        scat['theta'] = thetas
-        scat['vals'] = scatter
-        hpd, rmsd = calc_scatter_stats(thetas, scatter)
-        scat['hpd'] = hpd
-        scat['rmsd'] = rmsd
+        if calc_input:
+            print 'Calculating scatter displ (input)'
+            displ = self.displ['X']['img']['clip'][:, cols]
+            thetas, scatter = calc_scatter.calc_scatter(
+                displ, graze_angle=1.428, thetas=self.thetas,
+                n_proc=self.n_proc)
+            scat = self.scatter['input']
+            scat['img'] = displ.copy()
+            scat['theta'] = thetas
+            scat['vals'] = scatter
+            hpd, rmsd = calc_scatter_stats(thetas, scatter)
+            scat['hpd'] = hpd
+            scat['rmsd'] = rmsd
 
         for corr in self.corr_axes:
-
             print 'Calculating scatter displ (corrected)'
             displ = self.resid['X'][corr]['img']['clip'][:, cols]
             if self.piston_tilt:  # Remove piston and tilt

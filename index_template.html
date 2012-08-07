@@ -10,18 +10,20 @@
 
     <table>
       <tr>
-        <th>Case ID</th>     
-        <th>Sub-case ID</th> 
-        <th>Clip</th>        
-        <th>N subsample</th> 
+        <th>Case ID</th>
+        <th>Sub-case ID</th>
+        <th>Clip</th>
+        <th>N subsample</th>
+        <th>N strips</th>
         <th>Piston-tilt</th>
       </tr>
       {% for aoc in aocs %}
         <tr>
-           <td>{{aoc.case_id}}</td>     
-           <td><a href="{{aoc.link}}"> {{aoc.subcase_id}} </a></td>  
-           <td>{{aoc.clip}}</td>        
-           <td>{{aoc.n_ss}}</td>        
+           <td>{{aoc.case_id}}</td>
+           <td><a href="{{aoc.link}}"> {{aoc.subcase_id}} </a></td>
+           <td>{{aoc.clip}}</td>
+           <td>{{aoc.n_ss}}</td>
+           <td>{{aoc.n_strips}}</td>
            <td>{{aoc.piston_tilt}}</td>
         </tr>
       {% endfor %}
