@@ -2,7 +2,7 @@ import numpy as np
 
 import ifunc
 import calc_scatter
-
+import logging
 
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 AXES = ('X', 'RY')
@@ -88,10 +88,10 @@ class AdjOpticsCase(object):
             for axis in AXES:
                 self.ifuncs[axis] = ifuncs[axis].copy()
         else:  # load ifuncs
-            print 'Loading ifuncs X...'
+            logging.info('Loading ifuncs X...')
             self.ifuncs['X'] = ifuncs['load_func'](axis='X',
                                                    **ifuncs['kwargs'])
-            print 'Computing ifuncs RY...'
+            logging.info('Computing ifuncs RY...')
             n_ax, n_az = self.ifuncs['X'].shape[-2:]
             ifx = self.ifuncs['X'] = self.ifuncs['X'].reshape(-1, n_ax, n_az)
             ifry = self.ifuncs['RY'] = np.empty_like(ifx)
@@ -106,7 +106,7 @@ class AdjOpticsCase(object):
                 self.displ[axis]['img']['full'] = \
                     displ[axis]['img']['full'].copy()
         else:  # load displacements
-            print 'Loading displ ...'
+            logging.info('Loading displ ...')
             self.displ['X']['img']['full'], self.displ['RY']['img']['full'] = \
                 displ['load_func'](self.n_ax, self.n_az, **displ['kwargs'])
             self.displ['RY']['img']['full'] *= RAD2ARCSEC
@@ -129,14 +129,16 @@ class AdjOpticsCase(object):
 
     def calc_adj(self):
         for corr in self.corr_axes:
-            print 'Computing corr coeffs using axis', corr, '...'
+            logging.info('Computing corr coeffs using axis {}...'
+                         .format(corr))
             coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
                                        self.displ[corr]['img']['full'],
                                        n_ss=self.n_ss, clip=self.clip)
             self.coeffs[corr] = coeffs
             clip = self.clip
             for axis in self.displ_axes:
-                print "Computing adj[{}][{}][full,clip]".format(axis, corr)
+                logging.info("Computing adj[{}][{}][full,clip]".
+                             format(axis, corr))
                 adj = ifunc.calc_adj_displ(self.ifuncs[axis], coeffs)
                 self.adj[axis][corr]['full'] = adj
                 self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
@@ -167,7 +169,7 @@ class AdjOpticsCase(object):
         self.scatter['cols'] = cols
 
         if calc_input:
-            print 'Calculating scatter displ (input)'
+            logging.info('Calculating scatter displ (input)')
             displ = self.displ['X']['img']['clip'][:, cols]
             thetas, scatter = calc_scatter.calc_scatter(
                 displ, graze_angle=1.428, thetas=self.thetas,
@@ -181,7 +183,7 @@ class AdjOpticsCase(object):
             scat['rmsd'] = rmsd
 
         for corr in self.corr_axes:
-            print 'Calculating scatter displ (corrected)'
+            logging.info('Calculating scatter displ (corrected)')
             displ = self.resid['X'][corr]['img']['clip'][:, cols]
             if self.piston_tilt:  # Remove piston and tilt
                 remove_piston_tilt(displ)

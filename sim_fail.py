@@ -2,6 +2,7 @@
 
 import os
 import socket
+import logging
 
 import numpy as np
 import pyyaks.context
@@ -51,18 +52,24 @@ def get_args():
 
 def main():
     args = get_args()
+    pid = os.getpid()
+    hostname = socket.gethostname()
+
+    src['id'] = '{}/{}'.format(args.case_id, args.subcase_id)
+    if not os.path.exists(files['src_dir'].abs):
+        os.makedirs(files['src_dir'].abs)
+
+    logfile = os.path.join(files['src_dir'].abs,
+                           '{}-{}.log'.format(hostname, pid))
+    logging.basicConfig(filename=logfile, level=logging.INFO)
+    logging.info(str(args))
+
     aoc = AdjOpticsCase(case_id=args.case_id, subcase_id=args.subcase_id,
                         clip=args.clip, n_ss=args.ss,
                         piston_tilt=bool(args.piston_tilt),
                         displ_axes=['X'], corr_axes=['X'],
-                        n_proc=None)
+                        n_proc=None, n_strips=args.n_strips)
 
-    src['id'] = '{}/{}'.format(aoc.case_id, aoc.subcase_id)
-    if not os.path.exists(files['src_dir'].abs):
-        os.makedirs(files['src_dir'].abs)
-
-    pid = os.getpid()
-    hostname = socket.gethostname()
     outfile = os.path.join(files['src_dir'].abs,
                            'act_fail-{}-{}.dat'.format(hostname, pid))
 
@@ -88,15 +95,18 @@ def main():
 
         aoc.calc_adj()
         aoc.calc_stats()
-        aoc.calc_scatter(n_strips=args.n_strips, calc_input=False)
+        aoc.calc_scatter(calc_input=False)
 
         hpd = aoc.scatter['corr']['X']['hpd']
         rmsd = aoc.scatter['corr']['X']['rmsd']
+        resid_std = aoc.resid['X']['X']['std']['clip']
+        displ_std = aoc.displ['X']['std']['clip']
 
         with open(outfile, 'a') as f:
             i_fail_str = ','.join(str(x) for x in i_fail)
             print >>f, ' '.join(str(x) for x in
-                                (n_fail, hpd, rmsd, i_fail_str))
+                                (n_fail, hpd, rmsd, displ_std,
+                                 resid_std, i_fail_str))
 
 
 if __name__ == '__main__':
