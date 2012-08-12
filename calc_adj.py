@@ -71,7 +71,7 @@ def calc_adj_coeffs(ifuncs, coeffs):
 
 def make_plots(displ, adj, clip=None, col0=150, col1=160,
                fig1=None, fig2=None,
-               save=None):
+               save=None, vmin_arg=None, vmax_arg=None):
     if clip:
         displ = displ[clip:-clip, clip:-clip]
         adj = adj[clip:-clip, clip:-clip]
@@ -97,8 +97,8 @@ def make_plots(displ, adj, clip=None, col0=150, col1=160,
 
     resid = displ - adj
     residf = np.sort(resid.flatten())
-    vmin = residf[int(len(residf) * 0.01)]
-    vmax = residf[int(len(residf) * 0.99)]
+    vmin = vmin_arg or residf[int(len(residf) * 0.01)]
+    vmax = vmax_arg or residf[int(len(residf) * 0.99)]
     plt.subplot(3, 1, 3)
     plt.title('Residual')
     plt.imshow(resid, vmin=vmin, vmax=vmax)
