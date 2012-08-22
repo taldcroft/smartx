@@ -127,19 +127,24 @@ class AdjOpticsCase(object):
     def normalize(self, std, axis='X', clip=True):
         pass
 
+    def calc_coeffs(self, corr):
+        logging.info('Computing corr coeffs using axis {}...'
+                     .format(corr))
+        coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
+                                   self.displ[corr]['img']['full'],
+                                   n_ss=self.n_ss, clip=self.clip)
+        return coeffs
+
     def calc_adj(self):
         for corr in self.corr_axes:
-            logging.info('Computing corr coeffs using axis {}...'
-                         .format(corr))
-            coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
-                                       self.displ[corr]['img']['full'],
-                                       n_ss=self.n_ss, clip=self.clip)
-            self.coeffs[corr] = coeffs
+            if corr not in self.coeffs:
+                self.coeffs[corr] = self.calc_coeffs(corr)
             clip = self.clip
             for axis in self.displ_axes:
                 logging.info("Computing adj[{}][{}][full,clip]".
                              format(axis, corr))
-                adj = ifunc.calc_adj_displ(self.ifuncs[axis], coeffs)
+                adj = ifunc.calc_adj_displ(self.ifuncs[axis],
+                                           self.coeffs[corr])
                 self.adj[axis][corr]['full'] = adj
                 self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
 
