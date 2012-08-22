@@ -1,9 +1,15 @@
 """Run calc_adj for the exemplar data
 """
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import sys
 
+sys.path.insert(0, '..')
 import calc_adj
+import calc_scatter
+import adj_opt_case
 
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 clip = 20
@@ -49,18 +55,23 @@ fig2 = plt.figure(2, figsize=(6, 8))
 calc_adj.make_plots(displ_x, adj_x, fig1=fig1, fig2=fig2, clip=clip)
 # save=save + corr_using + '_X')
 
-figure(5, figsize=(8, 5))
-subplot(1, 2, 1)
+plt.figure(5, figsize=(8, 5))
+plt.subplot(1, 2, 1)
 coeffs2d = coeffs.reshape(22, 22)
 plt.imshow(coeffs2d, interpolation='nearest')
 plt.colorbar(fraction=0.07)
-subplot(1, 2, 2)
+plt.subplot(1, 2, 2)
 plt.hist(coeffs, bins=20)
 
-peak = np.max(coeffs)
-for noise in (0.00001, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1):
-    print 'Drive noise = {} (fraction of peak drive voltage)'.format(noise)
-    drive_noise = noise * peak
+reference = 'median'  # or 'peak'
+drive_ref = (np.median(abs(coeffs))
+             if reference == 'median'
+             else np.max(abs(coeffs)))
+
+for noise in (0.00001, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2):
+    print 'Drive noise = {} (fraction of {} drive voltage)'.format(
+        noise, reference)
+    drive_noise = noise * drive_ref
 
     coeffs_noisy = coeffs + np.random.normal(0.0, scale=drive_noise,
                                              size=len(coeffs))
@@ -71,8 +82,9 @@ for noise in (0.00001, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1):
     calc_adj.make_plots(displ_x, adj_x, fig1=fig1, fig2=fig2, clip=clip,
                         save='drive_noise_{}'.format(noise),
                         vmin_arg=-0.15, vmax_arg=0.15)
+    resid_x = displ_x - adj_x
+    thetas
 
 #In [64]: calc_adj.make_plots(displ_x, adj_x, fig1=fig1, fig2=fig2, clip=clip)
 #Input stddev, mean: 0.2538,-0.0406
 #Resid stddev, mean: 0.2842,-0.0303
-
