@@ -8,6 +8,8 @@ RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 AXES = ('X', 'RY')
 cache = {}
 
+logging.basicConfig(level=logging.INFO)
+
 
 class AutoDict(dict):
     """Implementation of perl's autovivification feature for Python dict."""
