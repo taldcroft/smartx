@@ -6,6 +6,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
+import os
+import socket
 
 sys.path.insert(0, '..')
 from adj_opt_case import AdjOpticsCase
@@ -23,6 +25,10 @@ def get_args():
                         type=str,
                         default='1',
                         help='Sub-case ID')
+    parser.add_argument('--n-sim',
+                        type=int,
+                        default=10000,
+                        help='Number of simulations')
     parser.add_argument('--clip',
                         type=int, default=20,
                         help='Edge clippping')
@@ -58,7 +64,8 @@ if __name__ == '__main__':
                         piston_tilt=bool(args.piston_tilt),
                         n_strips=args.n_strips,
                         displ_axes=displ_axes,
-                        corr_axes=corr_axes)
+                        corr_axes=corr_axes,
+                        n_proc=0)
 
     # Compute stats for zero-noise case
     aoc.calc_adj()
@@ -69,9 +76,13 @@ if __name__ == '__main__':
     drive_ref = getattr(np, args.drive_ref)(abs(coeffs))
     # noises = (0.00001, 0.001, 0.002, 0.005, 0.01, 0.02,
     #           0.05, 0.1, 0.15, 0.2)
-    noises = np.linspace(0, 0.2, 11)
+    noises = np.random.uniform(0, 0.2, args.n_sim)
+    noises[0] = 0
 
-    hpds = []
+    pid = os.getpid()
+    hostname = socket.gethostname()
+    outfile = os.path.join('drive_noise-{}-{}.dat'.format(hostname, pid))
+
     for noise in noises:
         print 'Drive noise = {} (fraction of {} drive voltage)'.format(
             noise, args.drive_ref)
@@ -90,19 +101,12 @@ if __name__ == '__main__':
         print 'Corr HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
                                                    scat['rmsd'])
 
-        hpds.append(scat['hpd'])
+        hpd = aoc.scatter['corr']['X']['hpd']
+        rmsd = aoc.scatter['corr']['X']['rmsd']
+        resid_std = aoc.resid['X']['X']['std']['clip']
+        displ_std = aoc.displ['X']['std']['clip']
 
-    hpds = np.array(hpds) / hpds[0]
-    plt.figure(figsize=(5, 3.5))
-    plt.clf()
-    plt.plot(noises, hpds, '-b')
-    plt.plot(noises, hpds, 'ob')
-    plt.xlabel('Drive noise relative to {} drive level'
-               .format(args.drive_ref))
-    # plt.title('HPD dependence on drive noise')
-    plt.ylabel('HPD relative to zero-noise case')
-    plt.ylim(0, None)
-    plt.xlim(-0.02, 0.22)
-    plt.tight_layout()
-    plt.grid()
-    plt.savefig('drive_noise.png')
+        with open(outfile, 'a') as f:
+            print >>f, ' '.join(str(x) for x in
+                                (noise, hpd, rmsd, displ_std,
+                                 resid_std))
