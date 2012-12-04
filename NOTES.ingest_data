@@ -1,3 +1,53 @@
+For W. Davis analysis cases
+----------------------------
+cd /data/aca/adj_optics/ifuncs/400um_eagle_p1000
+
+mkdir 10+0_brick-layout   
+cd 10+0_brick-layout   
+unzip ../0.4mm_Eagle_P1000/P1000_10+0_brick-layout_Q1.zip   
+cd ..
+mkdir 10+0_ellipse        
+cd 10+0_ellipse        
+unzip ../0.4mm_Eagle_P1000/P1000_10+0_ellipse_Q1.zip        
+cd ..
+mkdir 10+0_half-size
+cd 10+0_half-size
+unzip ../0.4mm_Eagle_P1000/P1000_10+0_half-size_Q1_rerun.zip
+cd ..
+mkdir 10+0_no-gaps        
+cd 10+0_no-gaps        
+unzip ../0.4mm_Eagle_P1000/P1000_10+0_no-gaps_Q1.zip        
+cd ..
+mkdir 10+2_half-size      
+cd 10+2_half-size      
+unzip ../0.4mm_Eagle_P1000/P1000_10+2_half-size_Q1.zip      
+cd ..
+
+cd 10+0_baseline
+python ../read_ifuncs.py
+cd ..
+
+cd 10+0_brick-layout  
+python ../read_ifuncs.py
+cd ..
+
+cd 10+0_ellipse        
+python ../read_ifuncs.py
+cd ..
+
+cd 10+0_half-size
+python ../read_ifuncs.py
+cd ..
+
+cd 10+0_no-gaps        
+python ../read_ifuncs.py
+cd ..
+
+cd 10+2_half-size      
+python ../read_ifuncs.py
+cd ..
+
+
 #########  For half data
 
 mv P1000_1umHalf-10+0_10,1a.txt  P1000_1umHalf-10+0_10,0.txt

@@ -42,6 +42,14 @@ CASES = {'10+0_half_exemplar':
                   title='10+2 supports with 1-g gravity load'),
          }
 
+for case_id in ('10+0_baseline', '10+0_brick-layout', '10+0_ellipse',
+                '10+0_half-size', '10+0_no-gaps', '10+2_half-size'):
+    CASES[case_id] = dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                                  'kwargs': {'case': case_id}},
+                          displ={'load_func': ifunc.load_file_legendre,
+                                 'kwargs': {'filename': 'data/exemplar_021312.dat'}},
+                          title='{} with exemplar displacements'.format(case_id))
+
 
 class AdjOpticsCase(object):
     """Provide the infrastructure to handle an analysis case for adjustable

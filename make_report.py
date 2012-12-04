@@ -220,11 +220,11 @@ def get_args():
                         type=int, default=5,
                         help='Sub-sampling')
     parser.add_argument('--n-strips',
-                        type=int, default=9,
+                        type=int, default=20,
                         help='Number of strips for scatter calculation')
     parser.add_argument('--piston-tilt',
-                        type=int, default=1,
-                        help='Sub-sampling')
+                        type=int, default=0,
+                        help='Apply piston / tilt correction')
     parser.add_argument('--displ-axes',
                         type=str, default="X,RY",
                         help='Displacement axes to compute')

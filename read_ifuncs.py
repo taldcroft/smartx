@@ -7,7 +7,7 @@ n_fea_axial = 411
 n_if_azim = 11
 n_if_axial = 11
 
-startrc = 0
+startrc = 1
 out = {}
 cols = 'X   Y   Z   RX  RY  RZ'.split()
 for col in cols:
@@ -15,25 +15,26 @@ for col in cols:
                         dtype=np.float64)
 colnames = ("Node  Displa-X   Displa-Y   Displa-Z   Displa-RX  "
             "Displa-RY  Displa-RZ".split())
-for mir in ('p', 's'):
-    for i in range(n_if_azim):
-        for j in range(n_if_axial):
-            fnames = glob('{}1000/ifuncs/*{}*1000*_{},{}.*'.format(
-                    mir, mir.upper(), j + startrc, i + startrc))
-            if len(fnames) != 1:
-                raise ValueError('Got {}'.format(fnames))
 
-            fname = fnames[0]
-            print 'Reading', fname
-            dat = asciitable.read(fname, guess=False,
-                                  Reader=asciitable.NoHeader,
-                                  names=colnames)
-            print '  processing'
-            for col in cols:
-                vals = dat['Displa-{}'.format(col)]
-                out[col][i, j] = vals.reshape(n_fea_azim,
-                                              n_fea_axial).transpose()
-            print '  done'
+for i in range(n_if_azim):
+    for j in range(n_if_axial):
+        fnames = glob('*_{},{}.dat'.format(j + startrc, i + startrc))
+        if len(fnames) != 1:
+            raise ValueError('Got {}'.format(fnames))
 
-    for col in cols:
-        np.save('{}1000/{}_ifuncs.npy'.format(mir, col), out[col])
+        fname = fnames[0]
+        print 'Reading', fname
+        dat = asciitable.read(fname, guess=False,
+                              Reader=asciitable.NoHeader,
+                              names=colnames,
+                              data_start=10,
+                              data_end=-5)
+        print '  processing'
+        for col in cols:
+            vals = dat['Displa-{}'.format(col)]
+            out[col][i, j] = vals.reshape(n_fea_azim,
+                                          n_fea_axial).transpose()
+        print '  done'
+
+for col in cols:
+    np.save('{}_ifuncs.npy'.format(col), out[col])
