@@ -27,6 +27,39 @@ files.update({'src_dir': '{{src.id}}',
               })
 
 
+def get_args():
+    import argparse
+    parser = argparse.ArgumentParser(description='Make report')
+    parser.add_argument('--case-id',
+                        type=str,
+                        default='10+0_half_exemplar',
+                        help='Case ID')
+    parser.add_argument('--subcase-id',
+                        type=str,
+                        default='1',
+                        help='Sub-case ID')
+    parser.add_argument('--clip',
+                        type=int, default=20,
+                        help='Edge clippping')
+    parser.add_argument('--ss',
+                        type=int, default=5,
+                        help='Sub-sampling')
+    parser.add_argument('--n-strips',
+                        type=int, default=20,
+                        help='Number of strips for scatter calculation')
+    parser.add_argument('--piston-tilt',
+                        type=int, default=0,
+                        help='Apply piston / tilt correction')
+    parser.add_argument('--displ-axes',
+                        type=str, default="X,RY",
+                        help='Displacement axes to compute')
+    parser.add_argument('--corr-axes',
+                        type=str, default="X,RY",
+                        help='Correction axes to compute')
+    args = parser.parse_args()
+    return args
+
+
 def make_scatter_plot(aoc, corr='X', filename=None):
     print 'Plotting scatter displ'
 
@@ -230,39 +263,6 @@ def make_report(aoc):
     # Save version of aoc without ifuncs, which are not interesting and big
     delattr(aoc, 'ifuncs')
     pickle.dump(aoc, open(files['aoc.pkl'].rel, 'w'), protocol=-1)
-
-
-def get_args():
-    import argparse
-    parser = argparse.ArgumentParser(description='Make report')
-    parser.add_argument('--case-id',
-                        type=str,
-                        default='10+0_half_exemplar',
-                        help='Case ID')
-    parser.add_argument('--subcase-id',
-                        type=str,
-                        default='1',
-                        help='Sub-case ID')
-    parser.add_argument('--clip',
-                        type=int, default=20,
-                        help='Edge clippping')
-    parser.add_argument('--ss',
-                        type=int, default=5,
-                        help='Sub-sampling')
-    parser.add_argument('--n-strips',
-                        type=int, default=20,
-                        help='Number of strips for scatter calculation')
-    parser.add_argument('--piston-tilt',
-                        type=int, default=0,
-                        help='Apply piston / tilt correction')
-    parser.add_argument('--displ-axes',
-                        type=str, default="X,RY",
-                        help='Displacement axes to compute')
-    parser.add_argument('--corr-axes',
-                        type=str, default="X,RY",
-                        help='Correction axes to compute')
-    args = parser.parse_args()
-    return args
 
 
 if __name__ == '__main__':
