@@ -23,6 +23,7 @@ files.update({'src_dir': '{{src.id}}',
                               '_corr_{{src.corr}}'),
               'axial_resid': '{{src.id}}/axial_resid_{{src.corr}}',
               'scatter': '{{src.id}}/scatter_corr_{{src.corr}}',
+              'enc_energy': '{{src.id}}/enc_energy_corr_{{src.corr}}',
               })
 
 
@@ -51,6 +52,33 @@ def make_scatter_plot(aoc, corr='X', filename=None):
     plt.xlim(-x0, x0)
     plt.grid()
     plt.legend(loc='upper left')
+    plt.tight_layout()
+    if filename is not None:
+        plt.savefig(filename)
+
+
+def make_ee_plot(aoc, corr='X', filename=None):
+    print 'Plotting encircled energy'
+
+    plt.figure(21, figsize=(5, 3.5))
+    plt.clf()
+    plt.rc("legend", fontsize=9)
+
+    scat = aoc.scatter['input']
+    label = 'Input diam 50%={:.2f} 90%={:.2f} 99%={:.2f} arcsec'.format(
+        scat['ee_d50'], scat['ee_d90'], scat['ee_d99'])
+    plt.plot(scat['ee_angle'], scat['ee_val'], '-b', label=label)
+
+    scat = aoc.scatter['corr'][corr]
+    label = 'Corr diam 50%={:.2f} 90%={:.2f} 99%={:.2f} arcsec'.format(
+        scat['ee_d50'], scat['ee_d90'], scat['ee_d99'])
+    plt.plot(scat['ee_angle'], scat['ee_val'], '-r', label=label)
+
+    plt.xlabel('Arcsec')
+    plt.title('Encircled energy fraction')
+    plt.xlim(0, 5)
+    plt.grid()
+    plt.legend(loc='lower left')
     plt.tight_layout()
     if filename is not None:
         plt.savefig(filename)
@@ -174,6 +202,7 @@ def make_report(aoc):
             write_scatter_data(aoc, corr, scatter_type,
                                files['img_scatter.dat'].abs)
 
+        make_ee_plot(aoc, corr, files['enc_energy.png'].abs)
         make_scatter_plot(aoc, corr, files['scatter.png'].abs)
         make_axial_resid_plot(aoc, corr, files['axial_resid.png'].abs)
 
@@ -185,6 +214,7 @@ def make_report(aoc):
                 subcases.append(
                     {'img_corr_file': files['img_corr.png'].rel,
                      'scatter_file': files['scatter.png'].rel,
+                     'enc_energy_file': files['enc_energy.png'].rel,
                      'axial_resid_file': files['axial_resid.png'].rel,
                      'axis': axis,
                      'corr': corr,

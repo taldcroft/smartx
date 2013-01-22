@@ -16,6 +16,8 @@
         <th>N subsample</th>
         <th>N strips</th>
         <th>Piston-tilt</th>
+        <th>50% diam</th>
+        <th>90% diam</th>
       </tr>
       {% for aoc in aocs %}
         <tr>
@@ -25,6 +27,8 @@
            <td>{{aoc.n_ss}}</td>
            <td>{{aoc.n_strips}}</td>
            <td>{{aoc.piston_tilt}}</td>
+           <td>{{aoc.ee50}}</td>
+           <td>{{aoc.ee90}}</td>
         </tr>
       {% endfor %}
     </table>

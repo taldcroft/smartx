@@ -17,6 +17,11 @@ for casepath in casepaths:
     aocfile = os.path.join(casepath, 'aoc.pkl')
     aoc = pickle.load(open(aocfile, 'r'))
     aoc.link = '{}/{}/index.html'.format(aoc.case_id, aoc.subcase_id)
+    try:
+        aoc.ee50 = '{:.2f}'.format(aoc.scatter['corr']['X']['ee_d50'])
+        aoc.ee90 = '{:.2f}'.format(aoc.scatter['corr']['X']['ee_d90'])
+    except ValueError as err:
+        print err
     aocs.append(aoc)
 
 

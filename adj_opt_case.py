@@ -193,9 +193,8 @@ class AdjOpticsCase(object):
             scat['img'] = displ.copy()
             scat['theta'] = thetas
             scat['vals'] = scatter
-            hpd, rmsd = calc_scatter_stats(thetas, scatter)
-            scat['hpd'] = hpd
-            scat['rmsd'] = rmsd
+            stats = calc_scatter_stats(thetas, scatter)
+            scat.update(stats)
 
         for corr in self.corr_axes:
             logging.info('Calculating scatter displ (corrected)')
@@ -211,9 +210,8 @@ class AdjOpticsCase(object):
             scat['img'] = displ.copy()
             scat['theta'] = thetas
             scat['vals'] = scatter
-            hpd, rmsd = calc_scatter_stats(thetas, scatter)
-            scat['hpd'] = hpd
-            scat['rmsd'] = rmsd
+            stats = calc_scatter_stats(thetas, scatter)
+            scat.update(stats)
 
 
 def remove_piston_tilt(displ):
@@ -228,6 +226,7 @@ def remove_piston_tilt(displ):
 def calc_scatter_stats(theta, scatter):
     """Return stats about scatter distribution.
     """
+    out = {}
     i_mid = len(theta) // 2
     i1 = 2 * i_mid - 1
     angle = theta[i_mid:i1]
@@ -237,9 +236,14 @@ def calc_scatter_stats(theta, scatter):
 
     ee = np.cumsum(sym_scatter)
     i_hpr = np.searchsorted(ee, 0.5)
-    angle_hpd = angle[i_hpr] * 2
+    out['hpd'] = angle[i_hpr] * 2
 
     i99 = np.searchsorted(ee, 0.99)
-    angle_rmsd = 2 * np.sqrt(np.sum(angle[:i99] ** 2 * sym_scatter[:i99])
-                             / np.sum(sym_scatter[:i99]))
-    return angle_hpd, angle_rmsd
+    out['rmsd'] = 2 * np.sqrt(np.sum(angle[:i99] ** 2 * sym_scatter[:i99])
+                              / np.sum(sym_scatter[:i99]))
+    out['ee_angle'] = angle
+    out['ee_val'] = ee
+    out['ee_d50'] = out['hpd']
+    out['ee_d90'] = angle[np.searchsorted(ee, 0.9)] * 2
+    out['ee_d99'] = angle[i99] * 2
+    return out  # angle_hpd, angle_rmsd, angle, ee
