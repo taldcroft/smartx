@@ -152,7 +152,7 @@ def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat',
         displ_x = displ_x * mount_map
 
     # 0.5 mm spacing * 1000 um / mm
-    displ_ry = np.gradient(Y_az_ax, 0.5 * 1000)[0]  # radians
+    displ_ry = np.gradient(displ_x, 0.5 * 1000)[0]  # radians
 
     return displ_x, displ_ry
 
