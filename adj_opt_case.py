@@ -67,7 +67,7 @@ class AdjOpticsCase(object):
     def __init__(self, ifuncs=None, displ=None,
                  case_id='10+2_exemplar',
                  subcase_id=1,
-                 clip=20, n_ss=5, piston_tilt=True,
+                 clip=20, bias_mult=None, n_ss=5, piston_tilt=True,
                  node_sep=500, units='um',
                  displ_axes=None,
                  corr_axes=None,
@@ -92,6 +92,9 @@ class AdjOpticsCase(object):
         self.corr_axes = corr_axes or AXES
         self.n_proc = n_proc
         self.n_strips = n_strips
+        self.n_ss = n_ss
+        self.clip = clip
+        self.bias_mult = bias_mult
 
         # Check if input ifuncs already has X and RY keys
         if all(axis in ifuncs for axis in AXES):
@@ -119,6 +122,8 @@ class AdjOpticsCase(object):
             logging.info('Loading displ ...')
             self.displ['X']['img']['full'], self.displ['RY']['img']['full'] = \
                 displ['load_func'](self.n_ax, self.n_az, **displ['kwargs'])
+            if self.bias_mult is not None:
+                self.apply_displ_bias()
             self.displ['RY']['img']['full'] *= RAD2ARCSEC
 
         # Provide clipped displacements
@@ -126,13 +131,23 @@ class AdjOpticsCase(object):
             self.displ[axis]['img']['clip'] = \
                 self.displ[axis]['img']['full'][clip:-clip, clip:-clip]
 
-        self.n_ss = n_ss
-        self.clip = clip
         self.coeffs = AutoDict()  # [corr_axis]
         self.adj = AutoDict()  # [axis][corr_axis]
         self.resid = AutoDict()  # [clip][type] for clip=('clip'|'full')
                                  # type = ('img'|'std'|'mean')
         self.scatter = AutoDict()
+
+    def apply_displ_bias(self):
+        logging.info('Applying displacement bias...')
+        clip = self.clip
+        displ_x_clip = self.displ['X']['img']['full'][clip:-clip, clip:-clip]
+        min_displ_x = np.percentile(displ_x_clip, 0.5)
+        max_displ_x = np.percentile(displ_x_clip, 99.5)
+        logging.info('  min_displ_x = {}'.format(min_displ_x))
+        bias = -min_displ_x + (max_displ_x - min_displ_x) * self.bias_mult
+        self.displ['X']['img']['full'] += bias
+        # self.displ['RY']['img']['full'] = np.gradient(self.displ['X']['img']['full'],
+        #                                              0.5 * 1000)[0]  # radians
 
     def normalize(self, std, axis='X', clip=True):
         pass
