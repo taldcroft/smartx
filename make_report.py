@@ -56,6 +56,9 @@ def get_args():
     parser.add_argument('--corr-axes',
                         type=str, default="X,RY",
                         help='Correction axes to compute')
+    parser.add_argument('--bias-mult',
+                        type=float,
+                        help='Bias multiplier factor')
     args = parser.parse_args()
     return args
 
@@ -77,7 +80,7 @@ def make_scatter_plot(aoc, corr='X', filename=None):
 
     scat = aoc.scatter['corr'][corr]
     label = 'Corr HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
-                                                  scat['rmsd'])
+                                                 scat['rmsd'])
     plt.plot(scat['theta'], scat['vals'], '-r', label=label)
 
     plt.xlabel('Arcsec')
@@ -270,7 +273,7 @@ if __name__ == '__main__':
     displ_axes = args.displ_axes.split(',')
     corr_axes = args.corr_axes.split(',')
     aoc = AdjOpticsCase(case_id=args.case_id, subcase_id=args.subcase_id,
-                        clip=args.clip, n_ss=args.ss,
+                        clip=args.clip, n_ss=args.ss, bias_mult=args.bias_mult,
                         piston_tilt=bool(args.piston_tilt),
                         n_strips=args.n_strips,
                         displ_axes=displ_axes,
