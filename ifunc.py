@@ -157,13 +157,14 @@ def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat',
     return displ_x, displ_ry
 
 
-def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0):
+def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0, offset_ax=1, offset_az=1, norm=1.0):
     x = np.linspace(-1, 1, n_az).reshape(1, n_az)
     y = np.linspace(-1, 1, n_ax).reshape(n_ax, 1)
-    displ_x = (1 - legendre(ord_ax)(y)) * (1 - legendre(ord_az)(x))  # um
+    displ_x = norm * (offset_ax - legendre(ord_ax)(y)) * (offset_az - legendre(ord_az)(x))  # um
     displ_ry = np.gradient(displ_x, 0.5 * 1000)[0]  # radians
 
     return displ_x, displ_ry
+
 
 def load_displ_10_0(n_ax, n_az, ord_ax=2, ord_az=1):
     pass
