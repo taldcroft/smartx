@@ -144,16 +144,17 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     displ = aoc.displ[axis]['img']
     adj = aoc.adj[axis][corr]
     resid = aoc.resid[axis][corr]['img']
+    coeffs = aoc.coeffs[corr].reshape(aoc.n_coeffs_ax, aoc.n_coeffs_az)
 
     n_clip = aoc.clip
     clipbox_x = [n_clip, nx - n_clip, nx - n_clip, n_clip, n_clip]
     clipbox_y = [n_clip, n_clip, ny - n_clip, ny - n_clip, n_clip]
     scatter_x = aoc.scatter['cols'] + n_clip
 
-    plt.figure(10, figsize=(6, 8))
+    plt.figure(10, figsize=(6, 11))
     plt.clf()
 
-    ax = plt.subplot(3, 1, 1)
+    ax = plt.subplot(4, 1, 1)
     vmin, vmax = np.percentile(np.hstack([displ['clip'], adj['clip']]),
                                [0.5, 99.5])
     plt.imshow(displ['full'], vmin=vmin, vmax=vmax)
@@ -163,7 +164,7 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     plt.title('Input distortion {}'.format(axis))
     plt.colorbar(fraction=0.07)
 
-    ax = plt.subplot(3, 1, 2)
+    ax = plt.subplot(4, 1, 2)
     plt.imshow(adj['full'], vmin=vmin, vmax=vmax)
     plt.title('Adjustment using {}'.format(corr))
     ax.axison = False
@@ -172,7 +173,7 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     plt.colorbar(fraction=0.07)
 
     vmin, vmax = np.percentile(resid['clip'], [0.5, 99.5])
-    ax = plt.subplot(3, 1, 3)
+    ax = plt.subplot(4, 1, 3)
     plt.title('Residual')
     plt.imshow(resid['full'], vmin=vmin, vmax=vmax)
     ax.axison = False
@@ -181,6 +182,15 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     plt.colorbar(fraction=0.07)
     for x in scatter_x:
         plt.plot([x, x], [n_clip, ny - n_clip], '-m')
+
+    vmin, vmax = np.percentile(coeffs[3:-3, 3:-3], [0.5, 99.5])
+    ax = plt.subplot(4, 1, 4)
+    plt.title('Coeffs')
+    plt.imshow(coeffs, vmin=vmin, vmax=vmax, interpolation='nearest')
+    ax.axison = False
+    ax.autoscale(enable=False)
+    plt.colorbar(fraction=0.07)
+
     if filename is not None:
         plt.savefig(filename)
 
