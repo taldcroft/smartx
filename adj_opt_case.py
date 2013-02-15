@@ -40,6 +40,46 @@ CASES = {'10+0_half_exemplar':
                          'kwargs': {'case': 'local/10+2/p1000'}},
                   case_id='10+2_gravity',
                   title='10+2 supports with 1-g gravity load'),
+         '10+0_baseline_flat':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0, 'offset_az': 0,
+                                    'ord_ax': 0, 'ord_az': 0,
+                                    'norm': 1.0}},
+                  title='10+0_baseline with flat 1.0 um displacement'),
+         '10+0_baseline_flat-2':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0, 'offset_az': 0,
+                                    'ord_ax': 0, 'ord_az': 0,
+                                    'norm': 2.0}},
+                  title='10+0_baseline with flat 2.0 um displacement'),
+         '10+0_baseline_leg20':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': 1.0}},
+                  title='10+0_baseline legendre-2-0 1.0 um displacement'),
+         '10+0_baseline_leg20_bias':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0.5, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': -1.0}},
+                  title='10+0_baseline legendre-2-0 w/positive bias and 1.0 um displacement'),
+         '10+0_baseline_leg20_bias-2':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0.5, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': -2.0}},
+                  title='10+0_baseline legendre-2-0 w/positive bias and 2.0 um displacement'),
          }
 
 for case_id in ('10+0_baseline', '10+0_brick-layout', '10+0_ellipse',
@@ -106,6 +146,7 @@ class AdjOpticsCase(object):
                                                    **ifuncs['kwargs'])
             logging.info('Computing ifuncs RY...')
             n_ax, n_az = self.ifuncs['X'].shape[-2:]
+            self.n_coeffs_ax, self.n_coeffs_az = self.ifuncs['X'].shape[:2]
             ifx = self.ifuncs['X'] = self.ifuncs['X'].reshape(-1, n_ax, n_az)
             ifry = self.ifuncs['RY'] = np.empty_like(ifx)
             for i in range(ifx.shape[0]):
@@ -157,7 +198,7 @@ class AdjOpticsCase(object):
                      .format(corr))
         coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
                                    self.displ[corr]['img']['full'],
-                                   n_ss=self.n_ss, clip=self.clip)
+                                   n_ss=self.n_ss, clip=self.clip // 2)
         return coeffs
 
     def calc_adj(self):

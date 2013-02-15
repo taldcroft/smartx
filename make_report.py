@@ -76,7 +76,7 @@ def make_scatter_plot(aoc, corr='X', filename=None):
     label = 'Input HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
                                                   scat['rmsd'])
     plt.plot(scat['theta'], scat['vals'] * scale, '-b', label=label)
-    x0 = scat['rmsd'] * 2
+    x0 = max(scat['rmsd'] * 2, 3)
 
     scat = aoc.scatter['corr'][corr]
     label = 'Corr HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
