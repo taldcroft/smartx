@@ -64,6 +64,12 @@ CASES = {'10+0_half_exemplar':
                                     'ord_ax': 2, 'ord_az': 0,
                                     'norm': 1.0}},
                   title='10+0_baseline legendre-2-0 1.0 um displacement'),
+         '10+0_baseline_leg20_iterfit':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_az': 2}},
+                  title='10+0_baseline legendre-2-0 like iter_fit'),
          '10+0_baseline_leg20_bias':
              dict(ifuncs={'load_func': ifunc.load_ifuncs,
                           'kwargs': {'case': '10+0_baseline'}},
@@ -80,6 +86,30 @@ CASES = {'10+0_half_exemplar':
                                     'ord_ax': 2, 'ord_az': 0,
                                     'norm': -2.0}},
                   title='10+0_baseline legendre-2-0 w/positive bias and 2.0 um displacement'),
+         '10+0_baseline_3x3':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline/3x3'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0.5, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': -2.0}},
+                  title='10+0_baseline/3x3 legendre-2-0'),
+         '10+0_baseline_no_edge_2x2':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline/no_edge_2x2'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0.5, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': -2.0}},
+                  title='10+0_baseline/no_edge_2x2 legendre-2-0'),
+         '10+0_baseline_no_edge_1x1':
+             dict(ifuncs={'load_func': ifunc.load_ifuncs,
+                          'kwargs': {'case': '10+0_baseline/no_edge_1x1'}},
+                  displ={'load_func': ifunc.load_displ_legendre,
+                         'kwargs': {'offset_ax': 0.5, 'offset_az': 0,
+                                    'ord_ax': 2, 'ord_az': 0,
+                                    'norm': -2.0}},
+                  title='10+0_baseline/no_edge_1x1 legendre-2-0'),
          }
 
 for case_id in ('10+0_baseline', '10+0_brick-layout', '10+0_ellipse',

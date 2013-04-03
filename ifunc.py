@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import scipy.linalg
 from scipy.special import legendre
@@ -83,6 +84,26 @@ def load_ifuncs(axis='X', case='10+2/p1000'):
     ifuncs[0:nr, nc:nc2] = if10[:, ::-1, :, ::-1]
     ifuncs[nr:nr2, nc:nc2] = symmfac * if10[::-1, ::-1, ::-1, ::-1]
     return ifuncs
+
+
+def slice_ifuncs(axis='X', case='10+0_baseline', nslice=3):
+    filename = 'data/{}/{}_ifuncs.npy'.format(case, axis)
+    if10 = np.load(filename)
+    nr, nc, n_ax, n_az = if10.shape
+    rows_per_act = n_ax // (nr * 2)  # only half the actuator ifuncs are stored
+    cols_per_act = n_az // (nc * 2)
+    ax_center = n_ax // 2
+    az_center = n_az // 2
+    ax0 = ax_center - nslice * rows_per_act
+    ax1 = ax_center + nslice * rows_per_act
+    az0 = az_center - nslice * cols_per_act
+    az1 = az_center + nslice * cols_per_act
+    out = if10[-nslice:, -nslice:, ax0:ax1, az0:az1]
+    outdir = 'data/{}/{}x{}'.format(case, nslice, nslice)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    filename = '{}/{}_ifuncs.npy'.format(outdir, axis)
+    np.save(filename, out)
 
 
 def load_displ_grav(n_ax, n_az, case='10+2/p1000'):

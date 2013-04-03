@@ -183,7 +183,10 @@ def make_imgs_plot(aoc, axis='X', corr='X', filename=None):
     for x in scatter_x:
         plt.plot([x, x], [n_clip, ny - n_clip], '-m')
 
-    vmin, vmax = np.percentile(coeffs[3:-3, 3:-3], [0.5, 99.5])
+    try:
+        vmin, vmax = np.percentile(coeffs[3:-3, 3:-3], [0.5, 99.5])
+    except ValueError:
+        vmin, vmax = np.percentile(coeffs, [0.5, 99.5])
     ax = plt.subplot(4, 1, 4)
     plt.title('Coeffs')
     plt.imshow(coeffs, vmin=vmin, vmax=vmax, interpolation='nearest')
