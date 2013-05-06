@@ -1,4 +1,7 @@
+import cPickle as pickle
 import os
+from itertools import izip
+
 import sherpa.astro.ui as ui
 import numpy as np
 import ifunc
@@ -6,16 +9,17 @@ import calc_scatter
 
 import xija.clogging as clogging   # get rid of this or something
 
-SHERPA_CONFIGS = {'levmar': {'epsfcn': 10.0, 'verbose': 1}}
+SHERPA_CONFIGS = {'levmar': {'epsfcn': 10.0, 'verbose': 1},
+                  'simplex': {'ftol': 1e-3}}
 
 if not 'ifuncs' in globals():
     N_SS = 5
-    CLIP = 75
+    AX_CLIP = 50
+    AZ_CLIP = 75
     ifuncs = ifunc.load_ifuncs(case='10+0_baseline/')
-    ifuncs = ifuncs[2:20, 2:20, :, :]
     N_ROWS, N_COLS, N_AX, N_AZ = ifuncs.shape
-    ax_slice = slice(CLIP, N_AX - CLIP, N_SS)
-    az_slice = slice(CLIP, N_AZ - CLIP, N_SS)
+    ax_slice = slice(AX_CLIP, N_AX - AX_CLIP, N_SS)
+    az_slice = slice(AZ_CLIP, N_AZ - AZ_CLIP, N_SS)
     i_ss, j_ss = np.mgrid[ax_slice, az_slice]
     M_3d_all = ifuncs.reshape(-1, N_AX, N_AZ)
     M_3d = M_3d_all[:, i_ss, j_ss]
@@ -24,7 +28,8 @@ if not 'ifuncs' in globals():
     displ_x_all, displ_ry_all = ifunc.load_displ_legendre(N_AX, N_AZ, offset_az=2)
     DISPL_X = displ_x_all[i_ss, j_ss].flatten().copy()
     print 'Computing coeffs'
-    coeffs = ifunc.calc_coeffs(ifuncs, displ_x_all, n_ss=N_SS, clip=CLIP)
+    coeffs = ifunc.calc_coeffs(ifuncs, displ_x_all, n_ss=N_SS,
+                               clip=min(AX_CLIP, AZ_CLIP))
 
 fit_logger = clogging.config_logger(
     'fit', level=clogging.INFO,
@@ -81,7 +86,9 @@ class CalcStat(object):
         # print 'fit_stat =', fit_stat
 
         # fit_logger.info('Fit statistic: {:.20f} {}'.format(fit_stat, self.parvals))
-
+        
+        #sys.stdout.write('{}\r'.format(fit_stat))
+        #sys.stdout.flush()
         return fit_stat, np.ones_like(self.displ)
 
 
@@ -113,7 +120,7 @@ def fit_adjuster_set(coeffs, adj_idxs, method='simplex'):
     ui.set_model(1, 'axo_mod')
 
     coeffs = coeffs.copy()  # Don't modify input coeffs
-    # coeffs[coeffs < 0] = 0  # Don't allow negative coeffs
+    coeffs[coeffs < 0] = 0  # Don't allow negative coeffs
 
     # Set frozen, min, and max attributes for each axo_mod parameter
     for adj_idx, par in zip(adj_idxs, axo_mod.pars):
@@ -140,7 +147,7 @@ def fit_adjuster_set(coeffs, adj_idxs, method='simplex'):
     for adj_idx, par in zip(adj_idxs, axo_mod.pars):
         coeffs[adj_idx] = abs(par.val)
 
-    return coeffs
+    return coeffs, ui.get_fit_results()
 
 
 def rand_iter_fit(coeffs, n_samp=10, n_adj=10, method='simplex'):
@@ -157,10 +164,10 @@ def rand_iter_fit(coeffs, n_samp=10, n_adj=10, method='simplex'):
     return coeffs1
 
 
-def sweep_cols_fit(coeffs, n_sweep=1, method='simplex'):
+def sweep_cols_fit(coeffs, n_sweep=1000, method='simplex'):
     coeffs1 = coeffs.copy()
-    n_col = 18
-    n_row = 18
+    n_col = 22
+    n_row = 22
     n_col2 = n_col // 2
     idxs2d = np.arange(n_row * n_col).reshape(n_row, n_col)
     for i_sweep in range(n_sweep):
@@ -170,60 +177,36 @@ def sweep_cols_fit(coeffs, n_sweep=1, method='simplex'):
                 print 'col =', i_col
                 print '*' * 30
                 adj_idxs = idxs2d[:, i_col].flatten()
-                coeffs1 = fit_adjuster_set(coeffs1, adj_idxs, method)
+                coeffs1, fit_results = fit_adjuster_set(coeffs1, adj_idxs, method)
+        pickle.dump(fit_results, open('sweep_fit_results.pkl', 'w'), protocol=-1)
         np.save('sweep_coeffs.npy', coeffs1)
+
         if os.path.exists('stop_sweep'):
             break
 
-    return coeffs1
+    return coeffs1, fit_results
 
 
-def calc_scatter_vals(coeffs, n_strips=21, n_proc=4):
-    out = {'input': {}, 'corr': {}}
-    theta_max = 2.55e-4
-    thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
-    out['theta'] = thetas
+def boxes_fit(coeffs, n_iter=1000, method='simplex'):
+    coeffs1 = coeffs.copy()
+    box_idxs = [0, 5, 9, 13, 17, 22]
+    idxs2d = np.arange(N_ROWS * N_COLS).reshape(N_ROWS, N_COLS)
+    fit_results = []
+    for i_iter in range(n_iter):
+        for row_i0, row_i1 in izip(box_idxs[:-1], box_idxs[1:]):
+            for col_i0, col_i1 in izip(box_idxs[:-1], box_idxs[1:]):
+                print '*' * 30
+                print 'rows, cols =', row_i0, row_i1, col_i0, col_i1
+                print '*' * 30
+                adj_idxs = idxs2d[row_i0:row_i1, col_i0:col_i1].flatten()
+                coeffs1, fit_result = fit_adjuster_set(coeffs1, adj_idxs, method)
+                fit_results.append(fit_result)
+        pickle.dump(fit_results, open('box_fit_results.pkl', 'w'), protocol=-1)
+        np.save('box_coeffs.npy', coeffs1)
+        if os.path.exists('stop_box'):
+            break
 
-    row_slice = slice(CLIP, N_AX - CLIP)
-    col_slice = slice(CLIP, N_AZ - CLIP)
-
-    # Compute the column position of axial strips
-    displ = displ_x_all[row_slice, col_slice]
-    cols = np.linspace(0, displ.shape[1], n_strips + 1).astype(int)
-    cols = (cols[1:] + cols[:-1]) // 2
-    out['cols'] = cols
-
-    print('Calculating scatter displ (input)')
-    theta_arcs, scatter = calc_scatter.calc_scatter(
-        displ[:, cols], graze_angle=1.428, thetas=thetas, n_proc=n_proc)
-    print np.std(scatter), np.sum(scatter), np.std(displ[:, cols])
-    figure(1)
-    clf()
-    plot(scatter)
-    scat = out['input']
-    scat['img'] = displ.copy()
-    scat['vals'] = scatter
-    stats = calc_scatter_stats(theta_arcs, scatter)
-    scat.update(stats)
-
-    print('Calculating scatter displ (corrected)')
-    adj_displ_all = calc_adj_displ(ifuncs, coeffs)
-    adj_displ = adj_displ_all[row_slice, col_slice]
-    resid = adj_displ - displ
-
-    theta_arcs, scatter = calc_scatter.calc_scatter(
-        resid[:, cols], graze_angle=1.428, thetas=thetas, n_proc=n_proc)
-    print np.std(scatter), np.sum(scatter), np.std(displ[:, cols])
-    figure(2)
-    clf()
-    plot(scatter)
-    scat = out['corr']
-    scat['img'] = adj_displ.copy()
-    scat['vals'] = scatter
-    stats = calc_scatter_stats(theta_arcs, scatter)
-    scat.update(stats)
-
-    return out
+    return coeffs1, fit_results
 
 
 def make_scatter_plot(aoc, corr='X', filename=None):
@@ -280,3 +263,52 @@ def calc_scatter_stats(theta, scatter):
     out['ee_d90'] = angle[np.searchsorted(ee, 0.9)] * 2
     out['ee_d99'] = angle[i99] * 2
     return out  # angle_hpd, angle_rmsd, angle, ee
+
+
+def calc_scatter_vals(coeffs, n_strips=21, n_proc=4, ax_clip=AX_CLIP,
+                      az_clip=AZ_CLIP, ifuncs=ifuncs):
+    out = {'input': {}, 'corr': {}}
+    theta_max = 2.55e-4
+    thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
+    out['theta'] = thetas
+
+    row_slice = slice(ax_clip, N_AX - ax_clip)
+    col_slice = slice(az_clip, N_AZ - az_clip)
+
+    # Compute the column position of axial strips
+    displ = displ_x_all[row_slice, col_slice]
+    cols = np.linspace(0, displ.shape[1], n_strips + 1).astype(int)
+    cols = (cols[1:] + cols[:-1]) // 2
+    out['cols'] = cols
+
+    print('Calculating scatter displ (input)')
+    theta_arcs, scatter = calc_scatter.calc_scatter(
+        displ[:, cols], graze_angle=1.428, thetas=thetas, n_proc=n_proc)
+    print np.std(scatter), np.sum(scatter), np.std(displ[:, cols])
+    figure(1)
+    clf()
+    plot(theta_arcs, scatter)
+    scat = out['input']
+    scat['img'] = displ.copy()
+    scat['vals'] = scatter
+    stats = calc_scatter_stats(theta_arcs, scatter)
+    scat.update(stats)
+
+    print('Calculating scatter displ (corrected)')
+    adj_displ_all = calc_adj_displ(ifuncs, coeffs)
+    adj_displ = adj_displ_all[row_slice, col_slice]
+    resid = adj_displ - displ
+
+    theta_arcs, scatter = calc_scatter.calc_scatter(
+        resid[:, cols], graze_angle=1.428, thetas=thetas, n_proc=n_proc)
+    print np.std(scatter), np.sum(scatter), np.std(displ[:, cols])
+    plot(theta_arcs, scatter)
+    scat = out['corr']
+    scat['img'] = adj_displ.copy()
+    scat['vals'] = scatter
+    stats = calc_scatter_stats(theta_arcs, scatter)
+    scat.update(stats)
+
+    return out
+
+
