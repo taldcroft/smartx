@@ -29,15 +29,19 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
     # Sub-sample by n_ss along axial and aximuthal axes.  This uses
     # the numpy mgrid convenience routine:
     # http://docs.scipy.org/doc/numpy/reference/generated/numpy.mgrid.html
-    i_ss, j_ss = np.mgrid[0:n_ax:n_ss, 0:n_az:n_ss]
-    M_3d = M_3d_all[:, i_ss, j_ss]
+    if n_ss:
+        i_ss, j_ss = np.mgrid[0:n_ax:n_ss, 0:n_az:n_ss]
+        M_3d = M_3d_all[:, i_ss, j_ss]
+        d_2d = displ[i_ss, j_ss]
+    else:
+        M_3d = M_3d_all
+        d_2d = displ
 
     # Now reshape to final 2d matrix (e.g. 3486 rows x 400 cols for
     # n_ss = 10)
     M = M_3d.reshape(M_3d.shape[0], -1).transpose()
 
-    # Subsample displacement matrix and then flatten to 1d
-    d_2d = displ[i_ss, j_ss]
+    # Flatten displacement to 1d
     d = d_2d.flatten()
 
     # Compute SVD and then the pseudo-inverse of M.
