@@ -2,6 +2,7 @@ import cPickle as pickle
 import os
 from itertools import izip
 
+import matplotlib.pyplot as plt
 import sherpa.astro.ui as ui
 import numpy as np
 import ifunc
@@ -12,28 +13,50 @@ import xija.clogging as clogging   # get rid of this or something
 SHERPA_CONFIGS = {'levmar': {'epsfcn': 10.0, 'verbose': 1},
                   'simplex': {'ftol': 1e-3}}
 
-if not 'ifuncs' in globals():
-    N_SS = 5
-    AX_CLIP = 50
-    AZ_CLIP = 75
-    ifuncs = ifunc.load_ifuncs(case='10+0_baseline/')
-    N_ROWS, N_COLS, N_AX, N_AZ = ifuncs.shape
-    ax_slice = slice(AX_CLIP, N_AX - AX_CLIP, N_SS)
-    az_slice = slice(AZ_CLIP, N_AZ - AZ_CLIP, N_SS)
+
+def get_slice(clip, axis_len, n_ss):
+    if isinstance(clip, (tuple, list)):
+        out_slice = slice(clip[0], clip[1], n_ss)
+    else:
+        out_slice = slice(clip, axis_len - clip, n_ss)
+    return out_slice
+
+
+def get_ifuncs_displ(case='10+0_baseline/'):
+    ifuncs = ifunc.load_ifuncs(case=case)
+    n_rows, n_cols, n_ax, n_az = ifuncs.shape
+    displ_x_all, displ_ry_all = ifunc.load_displ_legendre(n_ax, n_az, offset_az=2)
+    return ifuncs, displ_x_all
+
+
+def clip_ifuncs_displ(ifuncs, displ_x_all, n_ss=5, ax_clip=50, az_clip=75,
+                      row_slice=slice(None), col_slice=slice(None)):
+    # Use only selected actuators and regenerate n_nows, n_cols
+    ifuncs = ifuncs[row_slice, col_slice, :, :]
+    n_rows, n_cols, n_ax, n_az = ifuncs.shape
+
+    ax_slice = get_slice(ax_clip, n_ax, n_ss)
+    az_slice = get_slice(az_clip, n_az, n_ss)
+
     i_ss, j_ss = np.mgrid[ax_slice, az_slice]
-    M_3d_all = ifuncs.reshape(-1, N_AX, N_AZ)
+    ifuncs_clip_ss = ifuncs[:, :, i_ss, j_ss]
+    M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
     M_3d = M_3d_all[:, i_ss, j_ss]
     M_2d = M_3d.reshape(M_3d.shape[0], -1).transpose().copy()
 
-    displ_x_all, displ_ry_all = ifunc.load_displ_legendre(N_AX, N_AZ, offset_az=2)
-    DISPL_X = displ_x_all[i_ss, j_ss].flatten().copy()
-    print 'Computing coeffs'
-    coeffs = ifunc.calc_coeffs(ifuncs, displ_x_all, n_ss=N_SS,
-                               clip=min(AX_CLIP, AZ_CLIP))
+    displ_x = displ_x_all[i_ss, j_ss].flatten().copy()
+
+    return ifuncs_clip_ss, displ_x, M_2d
+
 
 fit_logger = clogging.config_logger(
     'fit', level=clogging.INFO,
     format='[%(levelname)s] (%(processName)-10s) %(message)s')
+
+
+def calc_inversion_solution(ifuncs, displ, n_ss, clip):
+    coeffs = ifunc.calc_coeffs(ifuncs, displ, n_ss=n_ss, clip=clip)
+    return coeffs
 
 
 def calc_adj_displ(ifuncs, coeffs):
@@ -86,15 +109,10 @@ class CalcStat(object):
         # print 'fit_stat =', fit_stat
 
         # fit_logger.info('Fit statistic: {:.20f} {}'.format(fit_stat, self.parvals))
-        
+
         #sys.stdout.write('{}\r'.format(fit_stat))
         #sys.stdout.flush()
         return fit_stat, np.ones_like(self.displ)
-
-
-def calc_inversion_solution(ifuncs, displ, n_ss, clip):
-    coeffs = ifunc.calc_coeffs(ifuncs, displ, n_ss=n_ss, clip=clip)
-    return coeffs
 
 
 def fit_adjuster_set(coeffs, adj_idxs, method='simplex'):
@@ -265,8 +283,8 @@ def calc_scatter_stats(theta, scatter):
     return out  # angle_hpd, angle_rmsd, angle, ee
 
 
-def calc_scatter_vals(coeffs, n_strips=21, n_proc=4, ax_clip=AX_CLIP,
-                      az_clip=AZ_CLIP, ifuncs=ifuncs):
+def calc_scatter_vals(coeffs, n_strips=21, n_proc=4, ax_clip=50,
+                      az_clip=75, ifuncs=None):
     out = {'input': {}, 'corr': {}}
     theta_max = 2.55e-4
     thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
