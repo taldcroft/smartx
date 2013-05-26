@@ -12,32 +12,58 @@ import pyyaks.logger
 logger = pyyaks.logger.get_logger()
 
 if 'ifuncs' not in globals():
+    print 'Loading influence functions...'
     ifuncs, displ = ifunc.get_ifuncs_displ()
+    N_AX, N_AZ = ifuncs.shape[-2:]
+    ifuncs_3d = ifuncs.reshape(-1, N_AX, N_AZ)
 
 
-def displ_sin_ax(n_cycle=1, ampl=0.5, bias=1.0):
-    n_ax, n_az = ifuncs.shape[2:4]
-    x = np.arange(n_ax, dtype=float) / n_ax * 2 * np.pi * n_cycle
+def displ_sin_ax(n_cycle=1, ampl=0.5, phase=0.0):
+    """
+    Sinusoidal oscillation in axial direction.  Phase is specified
+    in terms of cycles, so phase=0.25 corresponds to a cosine.
+    """
+    x = (np.arange(N_AX, dtype=float) / N_AX + phase) * 2 * np.pi * n_cycle
     x = x.reshape(-1, 1)
-    return bias * np.ones((n_ax, n_az)) + np.sin(x) * ampl
+    return np.sin(x) * ampl / n_cycle
 
 
-def displ_sin_az(n_cycle=1, ampl=0.5, bias=1.0):
-    n_ax, n_az = ifuncs.shape[2:4]
-    x = np.arange(n_az, dtype=float) / n_az * 2 * np.pi * n_cycle
+def displ_sin_az(n_cycle=1, ampl=0.5, phase=0.0):
+    """
+    Sinusoidal oscillation in azimuthal direction.  Phase is specified
+    in terms of cycles, so phase=0.25 corresponds to a cosine.
+    """
+    x = (np.arange(N_AZ, dtype=float) / N_AZ + phase) * 2 * np.pi * n_cycle
     x = x.reshape(1, -1)
-    return bias * np.ones((n_ax, n_az)) + np.sin(x) * ampl
+    return np.sin(x) * ampl / n_cycle
+
+
+def displ_flat(bias):
+    """
+    Flat displacement = ``bias`` everywhere.
+    """
+    out = np.ones((N_AX, N_AZ)) * bias
+    return out
+
+
+def displ_uniform_coeffs(bias):
+    """
+    Response for all coefficients set to ``bias``.
+    """
+    out = np.sum(ifuncs_3d, axis=0) * bias
+    return out
 
 
 def calc_plot_adj(row_clip=4, col_clip=4, ax_clip=75, az_clip=150,
-                  displ_func=displ_sin_ax, bias=1.0, ampl=0.5, n_cycle=1.0,
+                  displ_func=displ_sin_ax, bias_func=displ_flat,
+                  bias=1.0, ampl=0.5, n_cycle=1.0, phase=0.0,
                   plot_file=None):
     row_slice = slice(row_clip, -row_clip) if row_clip else slice(None, None)
     col_slice = slice(col_clip, -col_clip) if col_clip else slice(None, None)
     ax_slice = slice(ax_clip, -ax_clip)
     az_slice = slice(az_clip, -az_clip)
 
-    displ = displ_func(n_cycle, ampl, bias)
+    displ = displ_func(n_cycle, ampl, phase) + bias_func(bias)
 
     # Get stddev of input displacement within clipped region
     input_stddev = np.std(displ[ax_slice, az_slice])
