@@ -6,7 +6,62 @@ from scipy.special import legendre
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 
 
-def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
+def get_slice(clip, axis_len, n_ss):
+    if isinstance(clip, (tuple, list)):
+        out_slice = slice(clip[0], clip[1], n_ss)
+    else:
+        out_slice = slice(clip, axis_len - clip, n_ss)
+    return out_slice
+
+
+def get_ifuncs_displ(case='10+0_baseline/'):
+    ifuncs = load_ifuncs(case=case)
+    n_rows, n_cols, n_ax, n_az = ifuncs.shape
+    displ_x_all, displ_ry_all = load_displ_legendre(n_ax, n_az, offset_az=2)
+    return ifuncs, displ_x_all
+
+
+def clip_ifuncs_displ(ifuncs, displ_x_all, n_ss=5, ax_clip=50, az_clip=75,
+                      row_slice=slice(None), col_slice=slice(None)):
+    # Use only selected actuators and regenerate n_nows, n_cols
+    ifuncs = ifuncs[row_slice, col_slice, :, :]
+    n_rows, n_cols, n_ax, n_az = ifuncs.shape
+
+    ax_slice = get_slice(ax_clip, n_ax, n_ss)
+    az_slice = get_slice(az_clip, n_az, n_ss)
+
+    i_ss, j_ss = np.mgrid[ax_slice, az_slice]
+    ifuncs_clip_ss = ifuncs[:, :, i_ss, j_ss]
+    M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
+    M_3d = M_3d_all[:, i_ss, j_ss]
+    M_2d = M_3d.reshape(M_3d.shape[0], -1).transpose().copy()
+
+    displ_x = displ_x_all[i_ss, j_ss].flatten().copy()
+
+    return ifuncs_clip_ss, displ_x, M_2d
+
+
+def get_ax_az_clip(clip):
+    """
+    Returns ax_clip, az_clip for either a scalar or tuple value of ``clip``.
+    """
+    if isinstance(clip, tuple):
+        return clip
+    else:
+        return clip, clip
+
+
+def get_ax_az_slice(clip):
+    """
+    Returns ax_slice, az_slice for either a scalar or tuple value of ``clip``.
+    """
+    ax_clip, az_clip = get_ax_az_clip(clip)
+    ax_slice = slice(ax_clip, -ax_clip)
+    az_slice = slice(az_clip, -az_clip)
+    return ax_slice, az_slice
+
+
+def calc_coeffs(ifuncs, displ, n_ss=10, clip=None, adj_clip=None):
     """Calculate the best (least-squared) set of coefficients to
     adjust for a displacement ``displ`` given influence functions
     ``ifuncs`` and sub-sampling ``n_ss``.  If ``clip`` is supplied
@@ -17,10 +72,15 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
     coeffs: driving coefficients corresponding to ``ifuncs``
     """
 
+    if adj_clip:
+        ifuncs = ifuncs[adj_clip:-adj_clip, adj_clip:-adj_clip, :, :]
+
     # Clip boundaries
     if clip:
-        displ = displ[clip:-clip, clip:-clip]
-        ifuncs = ifuncs[..., clip:-clip, clip:-clip]
+        ax_slice, az_slice = get_ax_az_slice(clip)
+        displ = displ[ax_slice, az_slice]
+        print 'SHAPE', ifuncs.shape
+        ifuncs = ifuncs[..., ax_slice, az_slice]
 
     # Squash first two dimensions (20x20) of ifuncs into one (400)
     n_ax, n_az = ifuncs.shape[-2:]
@@ -56,13 +116,19 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None):
     return coeffs
 
 
-def calc_adj_displ(ifuncs, coeffs):
+def calc_adj_displ(ifuncs, coeffs, clip_adj=None):
     """Return the adjusted displacement as a 2-d array for the given ``ifuncs``
     and ``coeffs``.
     """
     n_ax, n_az = ifuncs.shape[-2:]
     M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
     M_2d_all = M_3d_all.reshape(M_3d_all.shape[0], -1).transpose()
+    if clip_adj:
+        n_rows, n_cols = 0  # FAIL
+        clip_coeffs_2d = coeffs.reshape(n_rows - 2 * clip_adj, n_cols - 2 * clip_adj)
+        coeffs_2d = np.zeros((n_rows, n_cols), dtype=np.float)
+        coeffs_2d[clip_adj:-clip_adj, clip_adj:-clip_adj] = clip_coeffs_2d
+        coeffs = coeffs_2d.ravel()
     adj = M_2d_all.dot(coeffs)
     adj_2d = adj.reshape(n_ax, n_az)
 

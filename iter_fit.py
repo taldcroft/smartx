@@ -3,7 +3,6 @@ import os
 from itertools import izip
 
 import matplotlib.pyplot as plt
-import sherpa.astro.ui as ui
 import numpy as np
 import ifunc
 import calc_scatter
@@ -12,41 +11,6 @@ import xija.clogging as clogging   # get rid of this or something
 
 SHERPA_CONFIGS = {'levmar': {'epsfcn': 10.0, 'verbose': 1},
                   'simplex': {'ftol': 1e-3}}
-
-
-def get_slice(clip, axis_len, n_ss):
-    if isinstance(clip, (tuple, list)):
-        out_slice = slice(clip[0], clip[1], n_ss)
-    else:
-        out_slice = slice(clip, axis_len - clip, n_ss)
-    return out_slice
-
-
-def get_ifuncs_displ(case='10+0_baseline/'):
-    ifuncs = ifunc.load_ifuncs(case=case)
-    n_rows, n_cols, n_ax, n_az = ifuncs.shape
-    displ_x_all, displ_ry_all = ifunc.load_displ_legendre(n_ax, n_az, offset_az=2)
-    return ifuncs, displ_x_all
-
-
-def clip_ifuncs_displ(ifuncs, displ_x_all, n_ss=5, ax_clip=50, az_clip=75,
-                      row_slice=slice(None), col_slice=slice(None)):
-    # Use only selected actuators and regenerate n_nows, n_cols
-    ifuncs = ifuncs[row_slice, col_slice, :, :]
-    n_rows, n_cols, n_ax, n_az = ifuncs.shape
-
-    ax_slice = get_slice(ax_clip, n_ax, n_ss)
-    az_slice = get_slice(az_clip, n_az, n_ss)
-
-    i_ss, j_ss = np.mgrid[ax_slice, az_slice]
-    ifuncs_clip_ss = ifuncs[:, :, i_ss, j_ss]
-    M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
-    M_3d = M_3d_all[:, i_ss, j_ss]
-    M_2d = M_3d.reshape(M_3d.shape[0], -1).transpose().copy()
-
-    displ_x = displ_x_all[i_ss, j_ss].flatten().copy()
-
-    return ifuncs_clip_ss, displ_x, M_2d
 
 
 fit_logger = clogging.config_logger(
@@ -121,6 +85,8 @@ def fit_adjuster_set(coeffs, adj_idxs, method='simplex'):
     specified by the array ``adj_idxs``.  The input ``coeffs`` are
     the best-fit adjustor coefficients for the last iteration.
     """
+    import sherpa.astro.ui as ui
+
     dummy_data = np.zeros(100)
     dummy_times = np.arange(100)
     ui.load_arrays(1, dummy_times, dummy_data)

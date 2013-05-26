@@ -128,7 +128,8 @@ class AdjOpticsCase(object):
     :param ifuncs: dict to load ifuncs or define ifuncs
     :param displ: dict to load or define displacements
     :param case_id: case identifier string for report naming
-    :param clip: number of rows / columns from edge to clip
+    :param adj_clip: number of ifunc actuator rows, cols from edge to clip (scalar)
+    :param clip: number of ax / az pixels from edge to clip (scalar or tuple)
     :param n_ss: sub-sample period (use 1 out of n_ss rows/columns)
     :param n_strips: number of axial strips for scatter calculation
     :param node_sep: node separation (microns)
@@ -137,6 +138,7 @@ class AdjOpticsCase(object):
     def __init__(self, ifuncs=None, displ=None,
                  case_id='10+2_exemplar',
                  subcase_id=1,
+                 adj_clip=None,
                  clip=20, bias_mult=None, n_ss=5, piston_tilt=True,
                  node_sep=500, units='um',
                  displ_axes=None,
@@ -163,6 +165,7 @@ class AdjOpticsCase(object):
         self.n_proc = n_proc
         self.n_strips = n_strips
         self.n_ss = n_ss
+        self.adj_clip = adj_clip
         self.clip = clip
         self.bias_mult = bias_mult
 
@@ -198,9 +201,10 @@ class AdjOpticsCase(object):
             self.displ['RY']['img']['full'] *= RAD2ARCSEC
 
         # Provide clipped displacements
+        ax_slice, az_slice = ifunc.get_ax_az_slice(self.clip)
         for axis in AXES:
             self.displ[axis]['img']['clip'] = \
-                self.displ[axis]['img']['full'][clip:-clip, clip:-clip]
+                self.displ[axis]['img']['full'][ax_slice, az_slice]
 
         self.coeffs = AutoDict()  # [corr_axis]
         self.adj = AutoDict()  # [axis][corr_axis]
@@ -210,8 +214,8 @@ class AdjOpticsCase(object):
 
     def apply_displ_bias(self):
         logging.info('Applying displacement bias...')
-        clip = self.clip
-        displ_x_clip = self.displ['X']['img']['full'][clip:-clip, clip:-clip]
+        ax_slice, az_slice = ifunc.get_ax_az_slice(self.clip)
+        displ_x_clip = self.displ['X']['img']['full'][ax_slice, az_slice]
         min_displ_x = np.percentile(displ_x_clip, 0.5)
         max_displ_x = np.percentile(displ_x_clip, 99.5)
         logging.info('  min_displ_x = {}'.format(min_displ_x))
@@ -228,21 +232,24 @@ class AdjOpticsCase(object):
                      .format(corr))
         coeffs = ifunc.calc_coeffs(self.ifuncs[corr],
                                    self.displ[corr]['img']['full'],
-                                   n_ss=self.n_ss, clip=self.clip // 2)
+                                   n_ss=self.n_ss,
+                                   clip=self.clip,
+                                   adj_clip=self.adj_clip)
         return coeffs
 
     def calc_adj(self):
         for corr in self.corr_axes:
             if corr not in self.coeffs:
                 self.coeffs[corr] = self.calc_coeffs(corr)
-            clip = self.clip
+            ax_slice, az_slice = ifunc.get_ax_az_slice(self.clip)
             for axis in self.displ_axes:
                 logging.info("Computing adj[{}][{}][full,clip]".
                              format(axis, corr))
                 adj = ifunc.calc_adj_displ(self.ifuncs[axis],
-                                           self.coeffs[corr])
+                                           self.coeffs[corr],
+                                           adj_clip=self.adj_clip)
                 self.adj[axis][corr]['full'] = adj
-                self.adj[axis][corr]['clip'] = adj[clip:-clip, clip:-clip]
+                self.adj[axis][corr]['clip'] = adj[ax_slice, az_slice]
 
     def calc_stats(self):
         for axis in self.displ_axes:
