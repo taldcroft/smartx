@@ -18,55 +18,112 @@ if 'ifuncs' not in globals():
     ifuncs_3d = ifuncs.reshape(-1, N_AX, N_AZ)
 
 
+class Displ(object):
+    pass
+
 def displ_sin_ax(n_cycle=1, ampl=0.5, phase=0.0):
     """
     Sinusoidal oscillation in axial direction.  Phase is specified
     in terms of cycles, so phase=0.25 corresponds to a cosine.
+
+    :param n_cycle: Number of cycles (default = 1)
+    :param ampl: Sinusoidal amplitude (microns)
+    :param phase: Phase offset in units of cycles
+
+    :returns: N_AX x N_AZ array
     """
     x = (np.arange(N_AX, dtype=float) / N_AX + phase) * 2 * np.pi * n_cycle
-    x = x.reshape(-1, 1)
-    return np.sin(x) * ampl / n_cycle
+    x = np.repeat(x, N_AZ).reshape(-1, N_AZ)
+    out = Displ()
+    out.vals = np.sin(x) * ampl / n_cycle
+    out.title = 'Displ-X (ampl={:.2f} n_cycle={:.1f} phase={})'.format(ampl, n_cycle, phase)
+    return out
 
 
 def displ_sin_az(n_cycle=1, ampl=0.5, phase=0.0):
     """
     Sinusoidal oscillation in azimuthal direction.  Phase is specified
     in terms of cycles, so phase=0.25 corresponds to a cosine.
+
+    :param n_cycle: Number of cycles (default = 1)
+    :param ampl: Sinusoidal amplitude (microns)
+    :param phase: Phase offset in units of cycles
+
+    :returns: N_AX x N_AZ array
     """
     x = (np.arange(N_AZ, dtype=float) / N_AZ + phase) * 2 * np.pi * n_cycle
-    x = x.reshape(1, -1)
+    x = np.repeat(x, N_AX).reshape(-1, N_AX).transpose()
+    out = Displ()
+    out.vals = np.sin(x) * ampl / n_cycle
+    out.title = 'Displ-X (ampl={:.2f} n_cycle={:.1f} phase={})'.format(ampl, n_cycle, phase)
     return np.sin(x) * ampl / n_cycle
 
 
-def displ_flat(bias):
+def displ_flat(ampl=1.0):
     """
-    Flat displacement = ``bias`` everywhere.
+    Flat displacement
+
+    :param ampl: Flat displacement value (microns)
+    :returns: N_AX x N_AZ array
     """
-    out = np.ones((N_AX, N_AZ)) * bias
+    out = Displ()
+    out.vals = np.ones((N_AX, N_AZ)) * ampl
+    out.title = 'Bias flat (ampl={})'.format(ampl)
     return out
 
 
-def displ_uniform_coeffs(bias):
+def displ_uniform_coeffs(ampl=1.0):
     """
-    Response for all coefficients set to ``bias``.
+    Response for all actuator coefficients set to ``bias``
+
+    A bias of 1.0 corresponds to the canonical 100 ppm strain
+    in the FEM influence function simulations.
+
+    :param ampl: value for all actuator coefficients
+    :returns: N_AX x N_AZ array
     """
-    out = np.sum(ifuncs_3d, axis=0) * bias
+    out = Displ()
+    out.vals = np.sum(ifuncs_3d, axis=0) * ampl
+    out.title = 'Bias uniform coefficients (ampl={})'.format(ampl)
     return out
 
 
-def calc_plot_adj(row_clip=4, col_clip=4, ax_clip=75, az_clip=150,
-                  displ_func=displ_sin_ax, bias_func=displ_flat,
-                  bias=1.0, ampl=0.5, n_cycle=1.0, phase=0.0,
+def calc_plot_adj(row_clip=2, col_clip=2,
+                  ax_clip=None, az_clip=None,
+                  bias=None, error=None,
                   plot_file=None):
+    """
+    Calculate and plot the displacement, residuals, and coeffs for
+    an input displacement function.
+
+    Example::
+
+      >>> ampl = 0.5
+      >>> n_cycle = 1.0
+      >>> phase = 0.0
+      >>> error = displ_sin_ax(n_cycle, ampl, phase)
+      >>> bias = displ_flat(1.0)
+      >>> calc_plot_adj(row_clip=2, col_clip=2, ax_clip=75, az_clip=150,
+                        bias=bias, error=error, plot_file=None)
+
+    :param row_clip: Number of actuator rows near edge to ignore
+    :param col_clip: Number of actuator columns near edge to ignore
+    :param ax_clip: Number of pixels near edge to clip in axial direction
+    :param az_clip: Number of pixels near edge to clip in azimuthal direction
+    :param bias: N_AX x N_AZ image of input bias
+    :param error: N_AX x N_AZ image of input figure error
+    :param plot_file: plot file name (default=None for no saved file)
+
+    :returns: dict of results
+    """
     row_slice = slice(row_clip, -row_clip) if row_clip else slice(None, None)
     col_slice = slice(col_clip, -col_clip) if col_clip else slice(None, None)
     ax_slice = slice(ax_clip, -ax_clip)
     az_slice = slice(az_clip, -az_clip)
 
-    displ = displ_func(n_cycle, ampl, phase) + bias_func(bias)
-
     # Get stddev of input displacement within clipped region
-    input_stddev = np.std(displ[ax_slice, az_slice])
+    displ = bias.vals + error.vals
+    input_stddev = np.std(error.vals[ax_slice, az_slice])
 
     # Get ifuncs and displ tht are clipped and sub-sampled (at default of n_ss=5)
     ifuncs_clip, displ_clip, M_2d = ifunc.clip_ifuncs_displ(
@@ -85,18 +142,28 @@ def calc_plot_adj(row_clip=4, col_clip=4, ax_clip=75, az_clip=150,
     resid_clip = resid[ax_slice, az_slice]
     resid_min, resid_max = np.percentile(resid[ax_slice, az_slice],
                                          [0.5, 99.5])
+    dv = 0.02
+
     resid_stddev = np.std(resid_clip)
-    plt.figure(1, figsize=(8, 12))
+    plt.figure(1, figsize=(14, 7))
     plt.clf()
-    plt.subplot(3, 1, 1)
+    plt.subplot(2, 2, 1)
     ax = plt.gca()
     ax.axison = False
-    plt.imshow(displ)
-    plt.title('Displ-X (bias={:.2f} ampl={:.2f} n_cycle={:.1f} stddev={:.4f})'
-              .format(bias, ampl, n_cycle, input_stddev))
+    vmin, vmax = np.percentile(bias.vals, [0.5, 99.5])
+    plt.imshow(bias.vals, vmin=vmin - dv, vmax=vmax + dv)
+    plt.title(bias.title)
     plt.colorbar(fraction=0.07)
 
-    plt.subplot(3, 1, 2)
+    plt.subplot(2, 2, 2)
+    ax = plt.gca()
+    ax.axison = False
+    vmin, vmax = np.percentile(error.vals, [0.5, 99.5])
+    plt.imshow(error.vals, vmin=vmin - dv, vmax=vmax + dv)
+    plt.title(error.title)
+    plt.colorbar(fraction=0.07)
+
+    plt.subplot(2, 2, 3)
     plt.imshow(resid, vmin=resid_min, vmax=resid_max)
     ax = plt.gca()
     ax.axison = False
@@ -106,7 +173,7 @@ def calc_plot_adj(row_clip=4, col_clip=4, ax_clip=75, az_clip=150,
     plt.plot(clipbox_x, clipbox_y, '-m')
     plt.colorbar(fraction=0.07)
 
-    plt.subplot(3, 1, 3)
+    plt.subplot(2, 2, 4)
     coeffs_all = np.zeros(ifuncs.shape[:2])
     coeffs_2d = coeffs.reshape(ifuncs_clip.shape[:2])
     coeffs_all[row_slice, col_slice] = coeffs_2d
@@ -131,6 +198,12 @@ def calc_plot_adj(row_clip=4, col_clip=4, ax_clip=75, az_clip=150,
     names = 'input_stddev resid_stddev resid_min resid_max coeffs_min coeffs_max'.split()
     _locals = locals()
     results = {name: _locals[name] for name in names}
+    results['resid_img'] = resid.copy()
+    results['bias_img'] = bias.vals.copy()
+    results['error_img'] = error.vals.copy()
+    results['coeffs_img'] = coeffs_all.copy()
+    for name in names:
+        logger.info('{:12s} : {:.3f}'.format(name, results[name]))
     return results
 
 
