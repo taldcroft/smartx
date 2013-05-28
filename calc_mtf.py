@@ -21,6 +21,7 @@ if 'ifuncs' not in globals():
 class Displ(object):
     pass
 
+
 def displ_sin_ax(n_cycle=1, ampl=0.5, phase=0.0):
     """
     Sinusoidal oscillation in axial direction.  Phase is specified
@@ -74,16 +75,23 @@ def displ_flat(ampl=1.0):
 
 def displ_uniform_coeffs(ampl=1.0):
     """
-    Response for all actuator coefficients set to ``bias``
+    Response for all actuator coefficients set to a uniform value.
 
-    A bias of 1.0 corresponds to the canonical 100 ppm strain
-    in the FEM influence function simulations.
+    An ``ampl`` of 1.0 corresponds to a value of 1 micron in a rectangle
+    covering the central 50% (in each axis) of the mirror.
 
-    :param ampl: value for all actuator coefficients
+    :param ampl: Median response in center 50% of mirror
     :returns: N_AX x N_AZ array
     """
     out = Displ()
-    out.vals = np.sum(ifuncs_3d, axis=0) * ampl
+    out.vals = np.sum(ifuncs_3d, axis=0)
+    # Renormalize based on the median in the center 20% portion
+    i0 = int(N_AX * 0.25)
+    i1 = int(N_AX * 0.75)
+    j0 = int(N_AZ * 0.25)
+    j1 = int(N_AZ * 0.75)
+    median_val = np.median(out.vals[i0:i1, j0:j1])
+    out.vals *= ampl / median_val
     out.title = 'Bias uniform coefficients (ampl={})'.format(ampl)
     return out
 
@@ -98,13 +106,10 @@ def calc_plot_adj(row_clip=2, col_clip=2,
 
     Example::
 
-      >>> ampl = 0.5
-      >>> n_cycle = 1.0
-      >>> phase = 0.0
-      >>> error = displ_sin_ax(n_cycle, ampl, phase)
+      >>> error = displ_sin_ax(n_cycle=1.0, ampl=0.5, phase=0.0)
       >>> bias = displ_flat(1.0)
-      >>> calc_plot_adj(row_clip=2, col_clip=2, ax_clip=75, az_clip=150,
-                        bias=bias, error=error, plot_file=None)
+      >>> out = calc_plot_adj(row_clip=2, col_clip=2, ax_clip=75, az_clip=150,
+                              bias=bias, error=error, plot_file=None)
 
     :param row_clip: Number of actuator rows near edge to ignore
     :param col_clip: Number of actuator columns near edge to ignore
@@ -207,40 +212,58 @@ def calc_plot_adj(row_clip=2, col_clip=2,
     return results
 
 
-def calc_grid(row_clip=2, col_clip=2, ax_clip=40, az_clip=80,
-              root_dir='mtf_grid',
-              n_cycles=[0.5, 1, 2, 3, 4, 5], ampls=[0.25, 0.5, 0.75], biases=[1],
-              force=False):
+def calc_grid(row_clip=2, col_clip=2,
+              ax_clip=40, az_clip=80,
+              root_dir='mtf/grid',
+              n_cycles=[0.5, 1, 2, 3, 4, 5],
+              ampls=[0.25, 0.5, 0.75],
+              biases=[1, 1.5],
+              phases=[0],
+              force=False,
+              bias_func=displ_uniform_coeffs,
+              error_func=displ_sin_ax):
+    import subprocess
+    if not os.path.exists(root_dir):
+        logger.info('Making directory {}'.format(root_dir))
+        os.mkdir(root_dir)
     results = shelve.open(os.path.join(root_dir, 'results.shelf'), writeback=True)
     for bias in biases:
         for n_cycle in n_cycles:
             for ampl in ampls:
-                key = (row_clip, col_clip, ax_clip, az_clip,
-                       bias, n_cycle, ampl)
-                if not force and repr(key) in results:
-                    logger.info('Skipping: {} already in results')
-                    continue
-                plot_file = 'mtf_{}_{}_{}_{}_bias{}_cyc{}_ampl{}.png'.format(*key)
-                logger.info('Computing results for {}'.format(os.path.basename(plot_file)))
-                result = calc_plot_adj(row_clip, col_clip, ax_clip, az_clip,
-                                       displ_func=displ_sin_ax,
-                                       n_cycle=n_cycle,  bias=bias, ampl=ampl,
-                                       plot_file=os.path.join(root_dir, plot_file))
-                results[repr(key)] = result
+                for phase in phases:
+                    key = (row_clip, col_clip, ax_clip, az_clip,
+                           bias, n_cycle, ampl, phase)
+                    if not force and repr(key) in results:
+                        logger.info('Skipping: {} already in results')
+                        continue
+                    plot_file = 'mtf_{}_{}_{}_{}_bias{}_cyc{}_ampl{}_phase{}.png'.format(*key)
+                    plot_file = os.path.join(root_dir, plot_file)
+                    logger.info('Computing results for {}'.format(os.path.basename(plot_file)))
+                    error_img = error_func(n_cycle=n_cycle, ampl=ampl, phase=phase)
+                    bias_img = bias_func(bias)
+                    result = calc_plot_adj(row_clip, col_clip, ax_clip, az_clip,
+                                           bias=bias_img, error=error_img,
+                                           plot_file=plot_file)
+                    # Remove images from results
+                    for key in list(result.keys()):
+                        if key.endswith('_img'):
+                            del result[key]
+                    results[repr(key)] = result
+                    subprocess.call(['convert', plot_file, '-trim', plot_file])
     results.close()
 
 
-def make_html(root_dir='mtf_grid'):
+def make_html(root_dir='mtf/grid'):
     import jinja2
 
-    template = jinja2.Template(open('mtf_template.html').read())
+    template = jinja2.Template(open('mtf/template.html').read())
     results_db = shelve.open(os.path.join(root_dir, 'results.shelf'))
     cases = []
     for key in sorted(results_db):
         vals = eval(key)
-        names = 'row_clip col_clip ax_clip az_clip bias n_cycle ampl'.split()
+        names = 'row_clip col_clip ax_clip az_clip bias n_cycle ampl phase'.split()
         case = {name: val for name, val in zip(names, vals)}
-        plot_file = 'mtf_{}_{}_{}_{}_bias{}_cyc{}_ampl{}.jpg'.format(*vals)
+        plot_file = 'mtf_{}_{}_{}_{}_bias{}_cyc{}_ampl{}_phase{}.png'.format(*vals)
         case['plot_name'] = os.path.basename(plot_file)
         case['plot_file'] = plot_file
         for name, val in results_db[key].items():
