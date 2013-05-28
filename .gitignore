@@ -3,3 +3,13 @@
 OLD*
 *.npy
 *.pkl
+drive_noise/data
+paper
+nonlinear-fit/*.ipynb
+reports/
+scatter_validate
+stop_sweep
+talk
+mtf
+NOTES/majordomo_list
+data
