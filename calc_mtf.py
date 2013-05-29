@@ -99,7 +99,8 @@ def displ_uniform_coeffs(ampl=1.0):
 def calc_plot_adj(row_clip=2, col_clip=2,
                   ax_clip=None, az_clip=None,
                   bias=None, error=None,
-                  plot_file=None):
+                  plot_file=None,
+                  max_iter=0):
     """
     Calculate and plot the displacement, residuals, and coeffs for
     an input displacement function.
@@ -117,6 +118,7 @@ def calc_plot_adj(row_clip=2, col_clip=2,
     :param az_clip: Number of pixels near edge to clip in azimuthal direction
     :param bias: N_AX x N_AZ image of input bias
     :param error: N_AX x N_AZ image of input figure error
+    :param max_iter: Maximum iterations for removing negative coefficients (default=0)
     :param plot_file: plot file name (default=None for no saved file)
 
     :returns: dict of results
@@ -130,14 +132,30 @@ def calc_plot_adj(row_clip=2, col_clip=2,
     displ = bias.vals + error.vals
     input_stddev = np.std(error.vals[ax_slice, az_slice])
 
-    # Get ifuncs and displ tht are clipped and sub-sampled (at default of n_ss=5)
-    ifuncs_clip, displ_clip, M_2d = ifunc.clip_ifuncs_displ(
+    # Get ifuncs and displ that are clipped and sub-sampled (at default of n_ss=5)
+    ifuncs_clip_4d, displ_clip, M_2d = ifunc.clip_ifuncs_displ(
         ifuncs, displ,
         row_slice=row_slice, col_slice=col_slice,
         ax_clip=ax_clip, az_clip=az_clip)
 
+    ifuncs_clip = ifuncs_clip_4d.reshape(-1, *(ifuncs_clip_4d.shape[-2:]))
+    coeffs_clip = np.zeros(len(ifuncs_clip))
     coeffs = ifunc.calc_coeffs(ifuncs_clip, displ_clip, n_ss=None, clip=0)
-    adj = ifunc.calc_adj_displ(ifuncs[row_slice, col_slice, :, :], coeffs)
+    pos_vals = np.ones(len(coeffs), dtype=bool)
+    for ii in range(max_iter):
+        pos = coeffs >= 0
+        pos_idxs = np.flatnonzero(pos)
+        if len(pos_idxs) == len(coeffs):
+            break
+        ifuncs_clip = ifuncs_clip.take(pos_idxs, axis=0)
+        coeffs = ifunc.calc_coeffs(ifuncs_clip, displ_clip, n_ss=None, clip=0)
+        pos_val_idxs = np.array([ii for ii, val in enumerate(pos_vals) if val])
+        new_neg_idxs = pos_val_idxs[~pos]
+        logger.info('Negative indexes: {}'.format(new_neg_idxs))
+        pos_vals[pos_val_idxs[~pos]] = False
+
+    coeffs_clip[np.where(pos_vals)] = coeffs
+    adj = ifunc.calc_adj_displ(ifuncs[row_slice, col_slice, :, :], coeffs_clip)
 
     ny, nx = ifuncs.shape[2:4]
     clipbox_x = [az_clip, nx - az_clip, nx - az_clip, az_clip, az_clip]
@@ -180,7 +198,7 @@ def calc_plot_adj(row_clip=2, col_clip=2,
 
     plt.subplot(2, 2, 4)
     coeffs_all = np.zeros(ifuncs.shape[:2])
-    coeffs_2d = coeffs.reshape(ifuncs_clip.shape[:2])
+    coeffs_2d = coeffs_clip.reshape(ifuncs_clip_4d.shape[:2])
     coeffs_all[row_slice, col_slice] = coeffs_2d
     cimg = np.dstack([coeffs_all, coeffs_all]).reshape(coeffs_all.shape[0],
                                                        coeffs_all.shape[1] * 2)
