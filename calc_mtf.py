@@ -4,12 +4,14 @@ Compute "modulation transfer function" in a fashion.
 
 import os
 import shelve
+import logging
+
 import ifunc
 import numpy as np
 import matplotlib.pyplot as plt
 
-import pyyaks.logger
-logger = pyyaks.logger.get_logger()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 if 'ifuncs' not in globals():
     print 'Loading influence functions...'
