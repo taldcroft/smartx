@@ -24,6 +24,16 @@ class Displ(object):
     pass
 
 
+def displ_exemplar(ampl=1.0, apply_10_0=True):
+    #def load_file_legendre(n_ax, n_az, filename='data/exemplar_021312.dat',
+    #                   apply_10_0=True):
+    out = Displ()
+    displ_x, displ_ry = ifunc.load_file_legendre(N_AX, N_AZ, apply_10_0=apply_10_0)
+    out.vals = displ_x * ampl
+    out.title = 'Displ-X exemplar data (ampl={:.2f})'.format(ampl)
+    return out
+
+
 def displ_sin_ax(n_cycle=1, ampl=0.5, phase=0.0):
     """
     Sinusoidal oscillation in axial direction.  Phase is specified
@@ -220,7 +230,8 @@ def calc_plot_adj(row_clip=2, col_clip=2,
         plt.savefig(plot_file)
 
     # Make resulting statistics available
-    names = 'input_stddev resid_stddev resid_min resid_max coeffs_min coeffs_max'.split()
+    names = ('input_stddev resid_stddev resid_min resid_max coeffs_min coeffs_max '
+             'ax_clip az_clip'.split())
     _locals = locals()
     results = {name: _locals[name] for name in names}
     results['resid_img'] = resid.copy()
