@@ -1,7 +1,12 @@
 import os
+import logging
+
 import numpy as np
 import scipy.linalg
 from scipy.special import legendre
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 RAD2ARCSEC = 206000.  # convert to arcsec for better scale
 
@@ -259,3 +264,134 @@ def load_displ_legendre(n_ax, n_az, ord_ax=2, ord_az=0, offset_ax=1, offset_az=1
 
 def load_displ_10_0(n_ax, n_az, ord_ax=2, ord_az=1):
     pass
+
+
+def calc_scatter(displ, n_strips=20, ax_clip=None, az_clip=None, n_proc=None):
+    """
+    Calculate the scatter intensity curve for given input displacement.
+
+    :param displ: displacement image (e.g. residual or figure error)
+    :param n_strips: number of evenly spaced strips for scatter intensity
+    :param ax_clip: pixels to clip in axial direction
+    :param az_clip: pixels to clip in azimuthal direction
+    :param n_proc: number of processors to use (do not set in IPython notebook)
+    """
+    import calc_scatter
+    ax_slice, az_slice = get_ax_az_slice((ax_clip, az_clip))
+    displ = displ[ax_slice, az_slice]
+
+    theta_max = 2.55e-4
+    thetas = np.linspace(-theta_max, theta_max, 10001)  # 10001
+
+    cols = np.linspace(0, displ.shape[1], n_strips + 1).astype(int)
+    cols = (cols[1:] + cols[:-1]) // 2
+
+    if not n_proc:
+        logger.info('Calculating scatter intensity')
+    displ_cols = displ[:, cols]
+
+    thetas, scatter = calc_scatter.calc_scatter(displ_cols,
+                                                graze_angle=1.428,
+                                                thetas=thetas,
+                                                n_proc=n_proc)
+    if not n_proc:
+        logger.info('Finished calculating scatter intensity')
+    stats = calc_scatter_stats(thetas, scatter)
+    stats['theta'] = thetas
+    stats['scatter'] = scatter
+
+    return stats
+
+
+def calc_scatter_stats(theta, scatter):
+    """Return stats about scatter distribution.
+    """
+    out = {}
+    i_mid = len(theta) // 2
+    i1 = 2 * i_mid - 1
+    angle = theta[i_mid:i1]
+
+    sym_scatter = scatter[i_mid:i1] + scatter[i_mid - 1:0:-1]
+    sym_scatter /= sym_scatter.sum()
+
+    ee = np.cumsum(sym_scatter)
+    i_hpr = np.searchsorted(ee, 0.5)
+    out['hpd'] = angle[i_hpr] * 2
+
+    i99 = np.searchsorted(ee, 0.99)
+    out['rmsd'] = 2 * np.sqrt(np.sum(angle[:i99] ** 2 * sym_scatter[:i99])
+                              / np.sum(sym_scatter[:i99]))
+    out['ee_angle'] = angle
+    out['ee_val'] = ee
+    out['ee_d50'] = out['hpd']
+    out['ee_d90'] = angle[np.searchsorted(ee, 0.9)] * 2
+    out['ee_d99'] = angle[i99] * 2
+    return out  # angle_hpd, angle_rmsd, angle, ee
+
+
+def plot_scatter_intensity(input_stats, resid_stats):
+    import matplotlib.pyplot as plt
+    print 'Plotting scatter displ'
+
+    plt.figure(11, figsize=(5, 3.5))
+    plt.clf()
+    plt.rc("legend", fontsize=9)
+
+    scale = np.max(resid_stats['scatter']) / np.max(input_stats['scatter']) / 2.0
+    label = 'Input HPD={:.2f} RMSD={:.2f}'.format(input_stats['hpd'], input_stats['rmsd'])
+    plt.plot(input_stats['theta'], input_stats['scatter'] * scale, '-b', label=label)
+    x0 = max(input_stats['rmsd'] * 2, 3)
+
+    label = 'Resid HPD={:.2f} RMSD={:.2f}'.format(resid_stats['hpd'], resid_stats['rmsd'])
+    plt.plot(resid_stats['theta'], resid_stats['scatter'], '-r', label=label)
+
+    plt.xlabel('Arcsec')
+    plt.title('Scatter')
+    plt.xlim(-x0, x0)
+    plt.grid()
+    plt.legend(loc='upper left')
+    plt.tight_layout()
+
+
+def plot_encircled_energy(aoc, corr='X', filename=None):
+    print 'Plotting encircled energy'
+
+    plt.figure(21, figsize=(5, 3.5))
+    plt.clf()
+    plt.rc("legend", fontsize=9)
+
+    scat = aoc.scatter['input']
+    label = 'Input diam 50%={:.2f} 90%={:.2f} 99%={:.2f} arcsec'.format(
+        scat['ee_d50'], scat['ee_d90'], scat['ee_d99'])
+    plt.plot(scat['ee_angle'], scat['ee_val'], '-b', label=label)
+
+    scat = aoc.scatter['corr'][corr]
+    label = 'Corr diam 50%={:.2f} 90%={:.2f} 99%={:.2f} arcsec'.format(
+        scat['ee_d50'], scat['ee_d90'], scat['ee_d99'])
+    plt.plot(scat['ee_angle'], scat['ee_val'], '-r', label=label)
+
+    plt.xlabel('Arcsec')
+    plt.title('Encircled energy fraction')
+    plt.xlim(0, 5)
+    plt.grid()
+    plt.legend(loc='lower left')
+    plt.tight_layout()
+    if filename is not None:
+        plt.savefig(filename)
+
+
+def make_axial_resid_plot(aoc, corr='X', filename=None):
+    print 'Plotting axial residuals'
+
+    plt.figure(12, figsize=(5, 3.5))
+    plt.clf()
+
+    displ = aoc.scatter['corr'][corr]['img']
+    plt.plot(displ)
+    plt.xlabel('Axial pixel')
+    plt.ylabel('X residual (um)')
+    plt.title('Axial strip residuals corrected on {}'.format(corr))
+    plt.grid()
+    plt.tight_layout()
+    if filename is not None:
+        plt.savefig(filename)
