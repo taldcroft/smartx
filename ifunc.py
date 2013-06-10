@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 import scipy.linalg
+import scipy.optimize
 from scipy.special import legendre
 
 logging.basicConfig(level=logging.INFO)
@@ -66,7 +67,7 @@ def get_ax_az_slice(clip):
     return ax_slice, az_slice
 
 
-def calc_coeffs(ifuncs, displ, n_ss=10, clip=None, adj_clip=None):
+def calc_coeffs(ifuncs, displ, n_ss=10, clip=None, adj_clip=None, nnls=False):
     """Calculate the best (least-squared) set of coefficients to
     adjust for a displacement ``displ`` given influence functions
     ``ifuncs`` and sub-sampling ``n_ss``.  If ``clip`` is supplied
@@ -109,14 +110,17 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None, adj_clip=None):
     # Flatten displacement to 1d
     d = d_2d.flatten()
 
-    # Compute SVD and then the pseudo-inverse of M.
-    # Note that .dot is the generalized array dot product and
-    # in this case is matrix multiplication.
-    U, s, Vh = scipy.linalg.svd(M, full_matrices=False)
-    Minv = Vh.transpose() .dot (np.diag(1 / s)) .dot (U.transpose())
+    if nnls:
+        coeffs, _ = scipy.optimize.nnls(M, d)
+    else:
+        # Compute SVD and then the pseudo-inverse of M.
+        # Note that .dot is the generalized array dot product and
+        # in this case is matrix multiplication.
+        U, s, Vh = scipy.linalg.svd(M, full_matrices=False)
+        Minv = Vh.transpose() .dot (np.diag(1 / s)) .dot (U.transpose())
 
-    # Finally compute the piezo driving coefficients
-    coeffs = Minv .dot (d)
+        # Finally compute the piezo driving coefficients
+        coeffs = Minv .dot (d)
 
     return coeffs
 

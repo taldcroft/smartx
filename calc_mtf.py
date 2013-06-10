@@ -112,7 +112,8 @@ def calc_plot_adj(row_clip=2, col_clip=2,
                   ax_clip=None, az_clip=None,
                   bias=None, error=None,
                   plot_file=None,
-                  max_iter=0):
+                  max_iter=0,
+                  nnls=False):
     """
     Calculate and plot the displacement, residuals, and coeffs for
     an input displacement function.
@@ -132,6 +133,7 @@ def calc_plot_adj(row_clip=2, col_clip=2,
     :param error: N_AX x N_AZ image of input figure error
     :param max_iter: Maximum iterations for removing negative coefficients (default=0)
     :param plot_file: plot file name (default=None for no saved file)
+    :param nnls: Use SciPy non-negative least squares solver instead of SVD
 
     :returns: dict of results
     """
@@ -152,7 +154,7 @@ def calc_plot_adj(row_clip=2, col_clip=2,
 
     ifuncs_clip = ifuncs_clip_4d.reshape(-1, *(ifuncs_clip_4d.shape[-2:]))
     coeffs_clip = np.zeros(len(ifuncs_clip))
-    coeffs = ifunc.calc_coeffs(ifuncs_clip, displ_clip, n_ss=None, clip=0)
+    coeffs = ifunc.calc_coeffs(ifuncs_clip, displ_clip, n_ss=None, clip=0, nnls=nnls)
     pos_vals = np.ones(len(coeffs), dtype=bool)
     for ii in range(max_iter):
         pos = coeffs >= 0
