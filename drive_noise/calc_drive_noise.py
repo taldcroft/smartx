@@ -4,43 +4,29 @@
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import sys
 import os
 import socket
 
 sys.path.insert(0, '..')
-from adj_opt_case import AdjOpticsCase
+import calc_mtf
+import ifunc
 
 
 def get_args():
     import argparse
-    parser = argparse.ArgumentParser(
-        description='Calc drive noise sensitivity')
+    parser = argparse.ArgumentParser(description='Calc drive noise sensitivity')
     parser.add_argument('--case-id',
                         type=str,
-                        default='10+0_half_exemplar',
+                        default='10+0_baseline',
                         help='Case ID')
-    parser.add_argument('--subcase-id',
-                        type=str,
-                        default='1',
-                        help='Sub-case ID')
     parser.add_argument('--n-sim',
                         type=int,
-                        default=10000,
+                        default=2,
                         help='Number of simulations')
-    parser.add_argument('--clip',
-                        type=int, default=20,
-                        help='Edge clippping')
-    parser.add_argument('--ss',
-                        type=int, default=5,
-                        help='Sub-sampling')
     parser.add_argument('--n-strips',
                         type=int, default=9,
                         help='Number of strips for scatter calculation')
-    parser.add_argument('--piston-tilt',
-                        type=int, default=0,
-                        help='Sub-sampling')
     parser.add_argument('--displ-axes',
                         type=str, default="X",
                         help='Displacement axes to compute')
@@ -48,35 +34,26 @@ def get_args():
                         type=str, default="X",
                         help='Correction axes to compute')
     parser.add_argument('--drive-ref',
-                        type=str, default="median",
-                        help='Drive reference (median|max)')
+                        type=float, default=5.0,
+                        help='Drive reference (units of 100 ppm strain, default=5.0)')
+    parser.add_argument('--n-proc',
+                        type=int, default=0,
+                        help='Number of processors (default=0 => no multiprocess)')
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
-    corr = 'X'
     args = get_args()
-    displ_axes = args.displ_axes.split(',')
-    corr_axes = args.corr_axes.split(',')
-    aoc = AdjOpticsCase(case_id=args.case_id, subcase_id=args.subcase_id,
-                        clip=args.clip, n_ss=args.ss,
-                        piston_tilt=bool(args.piston_tilt),
-                        n_strips=args.n_strips,
-                        displ_axes=displ_axes,
-                        corr_axes=corr_axes,
-                        n_proc=0)
 
-    # Compute stats for zero-noise case
-    aoc.calc_adj()
-    aoc.calc_stats()
-    aoc.calc_scatter()
+    # Compute solution for zero-noise case
+    error = calc_mtf.displ_exemplar(ampl=1.0, apply_10_0=True)
+    bias = calc_mtf.displ_flat(0.4)
+    out = calc_mtf.calc_plot_adj(row_clip=2, col_clip=2, ax_clip=40, az_clip=80,
+                                 bias=bias, error=error, plot_file=None, max_iter=0, nnls=True)
 
-    coeffs = aoc.coeffs['X']
-    drive_ref = getattr(np, args.drive_ref)(abs(coeffs))
-    # noises = (0.00001, 0.001, 0.002, 0.005, 0.01, 0.02,
-    #           0.05, 0.1, 0.15, 0.2)
-    noises = np.random.uniform(0, 0.2, args.n_sim)
+    coeffs = out['coeffs_img'].flatten()
+    noises = np.random.uniform(0, 0.05, args.n_sim)
     noises[0] = 0
 
     pid = os.getpid()
@@ -86,27 +63,26 @@ if __name__ == '__main__':
     for noise in noises:
         print 'Drive noise = {} (fraction of {} drive voltage)'.format(
             noise, args.drive_ref)
-        drive_noise = noise * drive_ref
+        drive_noise = noise * args.drive_ref
 
+        coeffs_noisy = coeffs.copy()
         if noise > 0:
-            coeffs_noisy = coeffs + np.random.normal(0.0, scale=drive_noise,
-                                                     size=len(coeffs))
+            ok = coeffs > 0  # Only add noise to actuators that are being driven
+            coeffs_noisy[ok] += np.random.normal(0.0, scale=drive_noise,
+                                                 size=len(coeffs))[ok]
+            coeffs_noisy = np.abs(coeffs_noisy)
 
-            aoc.coeffs[corr] = coeffs_noisy
-            aoc.calc_adj()
-            aoc.calc_stats()
-            aoc.calc_scatter()
+        adj_displ = ifunc.calc_adj_displ(calc_mtf.ifuncs, coeffs_noisy)
+        resid = bias.vals + error.vals - adj_displ
+        resid_stats = ifunc.calc_scatter(resid,
+                                         ax_clip=out['ax_clip'], az_clip=out['az_clip'],
+                                         n_proc=args.n_proc, n_strips=args.n_strips)
+        print 'Corr HPD={:.2f} RMSD={:.2f}'.format(resid_stats['hpd'],
+                                                   resid_stats['rmsd'])
 
-        scat = aoc.scatter['corr'][corr]
-        print 'Corr HPD={:.2f} RMSD={:.2f}'.format(scat['hpd'],
-                                                   scat['rmsd'])
-
-        hpd = aoc.scatter['corr']['X']['hpd']
-        rmsd = aoc.scatter['corr']['X']['rmsd']
-        resid_std = aoc.resid['X']['X']['std']['clip']
-        displ_std = aoc.displ['X']['std']['clip']
+        hpd = resid_stats['hpd']
+        rmsd = resid_stats['rmsd']
 
         with open(outfile, 'a') as f:
             print >>f, ' '.join(str(x) for x in
-                                (noise, hpd, rmsd, displ_std,
-                                 resid_std))
+                                (noise, hpd, rmsd))
