@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 from numpy import pi, sin, cos, exp, abs
 from scipy.interpolate import interp1d
@@ -53,6 +55,7 @@ def calc_scatter(displ, dx=500, graze_angle=2.0, scale=np.sqrt(2), lam=1.24e-3,
         from multiprocessing import Pool
         pool = Pool(processes=n_proc)
         I_scatter = pool.map(calc_func, list(thetas))
+        pool.close()
     else:
         I_scatter = [calc_func(x) for x in thetas]
 
@@ -100,6 +103,10 @@ def main():
     displ = hdus[0].data
     hdus.close()
 
+    print 'Read in FITS image {!r}'.format(opt.resid_file)
+    print 'Image size: {} rows x {} cols'.format(displ.shape[0], displ.shape[1])
+    print 'Image row 0 (cols 0..3) : {}'.format(displ[0][0:4])
+    print
     theta_max = 2.55e-4
     thetas_in = np.linspace(-theta_max, theta_max, 10001)  # 10001
 
@@ -107,6 +114,7 @@ def main():
     cols = np.linspace(0, displ.shape[1], opt.n_strips + 1).astype(int)
     cols = (cols[1:] + cols[:-1]) // 2
 
+    print 'Calculating scatter intensity using {} processors'.format(opt.n_proc)
     thetas, scatter = calc_scatter(displ[:, cols], dx=opt.dx, graze_angle=opt.graze_angle,
                                    lam=opt.lam, thetas=thetas_in, d_theta=opt.d_theta,
                                    n_x=opt.n_x, n_proc=opt.n_proc)
@@ -116,10 +124,10 @@ def main():
     dat = Table([thetas, scatter], names=['theta', 'scatter'])
     dat.write(outroot + '.dat', format='ascii')
 
-    print '# Scatter statistics:'
+    print 'Scatter statistics:'
     out = calc_scatter_stats(thetas, scatter)
     for key in ('ee_d50', 'ee_d90', 'ee_d99', 'hpd', 'rmsd'):
-        print '# {} = {:.4f}'.format(key, out[key])
+        print '  {} = {:.4f}'.format(key, out[key])
 
 
 def get_opt():
