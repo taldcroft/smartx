@@ -125,18 +125,27 @@ def calc_coeffs(ifuncs, displ, n_ss=10, clip=None, adj_clip=None, nnls=False):
     return coeffs
 
 
-def calc_adj_displ(ifuncs, coeffs, clip_adj=None):
+def calc_adj_displ(ifuncs, coeffs, adj_clip=None):
     """Return the adjusted displacement as a 2-d array for the given ``ifuncs``
     and ``coeffs``.
     """
     n_ax, n_az = ifuncs.shape[-2:]
+    if len(ifuncs.shape) == 3:
+        n_actuators = ifuncs.shape[0]
+        n_rows = n_cols = int(np.round(np.sqrt(n_actuators)))
+        if n_rows * n_cols != n_actuators:
+            raise ValueError('Assumed n_rows == n_cols for actuators, but got {} and {}'
+                             .format(n_rows, n_cols))
+    elif len(ifuncs.shape) == 4:
+        n_rows, n_cols = ifuncs.shape[:2]
+    else:
+        raise ValueError('ifuncs must be 3 or 4-d, got: {}'.format(ifuncs.shape))
     M_3d_all = ifuncs.reshape(-1, n_ax, n_az)
     M_2d_all = M_3d_all.reshape(M_3d_all.shape[0], -1).transpose()
-    if clip_adj:
-        n_rows, n_cols = 0  # FAIL
-        clip_coeffs_2d = coeffs.reshape(n_rows - 2 * clip_adj, n_cols - 2 * clip_adj)
+    if adj_clip:
+        clip_coeffs_2d = coeffs.reshape(n_rows - 2 * adj_clip, n_cols - 2 * adj_clip)
         coeffs_2d = np.zeros((n_rows, n_cols), dtype=np.float)
-        coeffs_2d[clip_adj:-clip_adj, clip_adj:-clip_adj] = clip_coeffs_2d
+        coeffs_2d[adj_clip:-adj_clip, adj_clip:-adj_clip] = clip_coeffs_2d
         coeffs = coeffs_2d.ravel()
     adj = M_2d_all.dot(coeffs)
     adj_2d = adj.reshape(n_ax, n_az)
