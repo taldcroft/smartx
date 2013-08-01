@@ -80,8 +80,8 @@ def calc_scatter_stats(theta, scatter):
     out['hpd'] = angle[i_hpr] * 2
 
     i99 = np.searchsorted(ee, 0.99)
-    out['rmsd'] = 2 * np.sqrt(np.sum(angle[:i99] ** 2 * sym_scatter[:i99])
-                              / np.sum(sym_scatter[:i99]))
+    out['rmsd'] = 2 * np.sqrt(np.sum(angle ** 2 * sym_scatter)
+                              / np.sum(sym_scatter))
     out['ee_angle'] = angle
     out['ee_val'] = ee
     out['ee_d50'] = out['hpd']
