@@ -4,8 +4,8 @@ import asciitable
 
 n_fea_azim = 821
 n_fea_axial = 411
-n_if_azim = 11
-n_if_axial = 11
+n_if_azim = 21
+n_if_axial = 21
 
 startrc = 1
 out = {}

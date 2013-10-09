@@ -13,11 +13,30 @@ import matplotlib.pyplot as plt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
-if 'ifuncs' not in globals():
-    print 'Loading influence functions...'
-    ifuncs, displ = ifunc.get_ifuncs_displ()
+RAD2ARCSEC = 206000.
+N_AX = N_AZ = None  # For pyflakes
+
+if 'CASE' not in globals():
+    CASE = '10+0_baseline'
+
+if 'AXIS' not in globals():
+    AXIS = 'X'
+
+
+def load_ifuncs():
+    global ifuncs
+    global displ
+    global N_AX
+    global N_AZ
+    print 'Loading influence functions', CASE, 'for axis', AXIS
+    ifuncs, displ = ifunc.get_ifuncs_displ(case=CASE, axis=AXIS)
+    if AXIS == 'RY':
+        ifuncs *= RAD2ARCSEC
     N_AX, N_AZ = ifuncs.shape[-2:]
-    ifuncs_3d = ifuncs.reshape(-1, N_AX, N_AZ)
+
+
+if 'ifuncs' not in globals():
+    load_ifuncs()
 
 
 class Displ(object):
@@ -29,8 +48,11 @@ def displ_exemplar(ampl=1.0, apply_10_0=True):
     #                   apply_10_0=True):
     out = Displ()
     displ_x, displ_ry = ifunc.load_file_legendre(N_AX, N_AZ, apply_10_0=apply_10_0)
-    out.vals = displ_x * ampl
-    out.title = 'Displ-X exemplar data (ampl={:.2f})'.format(ampl)
+    if AXIS == 'X':
+        out.vals = displ_x * ampl
+    else:
+        out.vals = displ_ry * ampl * RAD2ARCSEC  # convert displ from radians to arcsec
+    out.title = 'Displ-{} exemplar data (ampl={:.2f})'.format(AXIS, ampl)
     return out
 
 
@@ -95,6 +117,7 @@ def displ_uniform_coeffs(ampl=1.0):
     :param ampl: Median response in center 50% of mirror
     :returns: N_AX x N_AZ array
     """
+    ifuncs_3d = ifuncs.reshape(-1, N_AX, N_AZ)
     out = Displ()
     out.vals = np.sum(ifuncs_3d, axis=0)
     # Renormalize based on the median in the center 20% portion

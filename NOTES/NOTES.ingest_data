@@ -47,6 +47,27 @@ cd 10+2_half-size
 python ../read_ifuncs.py
 cd ..
 
+####### New cases Sep-2013  ###########
+
+cd /data/aca/adj_optics/ifuncs/400um_eagle_p1000
+
+mkdir 10+0_5x10mm-0.2gap
+cd !$
+ln -s ../../ADVG_Case1_P1000 ./
+unzip ADVG_Case1_P1000/*A.zip
+unzip ADVG_Case1_P1000/*B.zip
+unzip ADVG_Case1_P1000/*C.zip
+unzip ADVG_Case1_P1000/*D.zip
+
+# Read with read_ifuncs.py
+
+mv RX_ifuncs.npy  RX_ifuncs_irreg.npy 
+mv RY_ifuncs.npy  RY_ifuncs_irreg.npy 
+mv RZ_ifuncs.npy  RZ_ifuncs_irreg.npy 
+mv X_ifuncs.npy   X_ifuncs_irreg.npy  
+mv Y_ifuncs.npy   Y_ifuncs_irreg.npy  
+mv Z_ifuncs.npy   Z_ifuncs_irreg.npy  
+
 
 #########  For half data
 

@@ -20,11 +20,12 @@ def get_slice(clip, axis_len, n_ss):
     return out_slice
 
 
-def get_ifuncs_displ(case='10+0_baseline/'):
-    ifuncs = load_ifuncs(case=case)
+def get_ifuncs_displ(case='10+0_baseline/', axis='X'):
+    ifuncs = load_ifuncs(case=case, axis=axis)
     n_rows, n_cols, n_ax, n_az = ifuncs.shape
     displ_x_all, displ_ry_all = load_displ_legendre(n_ax, n_az, offset_az=2)
-    return ifuncs, displ_x_all
+    displ = displ_x_all if axis == 'X' else displ_ry_all
+    return ifuncs, displ
 
 
 def clip_ifuncs_displ(ifuncs, displ_x_all, n_ss=5, ax_clip=50, az_clip=75,
